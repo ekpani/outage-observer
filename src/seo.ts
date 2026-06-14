@@ -47,8 +47,9 @@ function statusPill(level: Level): string {
 }
 
 // ---- Page shell (dark-first, on brand, no app JS) ----
-function shell(opts: { title: string; description: string; canonical: string; jsonld: object[]; body: string }): string {
+function shell(opts: { title: string; description: string; canonical: string; jsonld: object[]; body: string; image?: string }): string {
   const ld = opts.jsonld.map((o) => `<script type="application/ld+json">${JSON.stringify(o)}</script>`).join("\n");
+  const image = opts.image ?? SITE + "/og.png";
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -61,8 +62,11 @@ function shell(opts: { title: string; description: string; canonical: string; js
 <meta property="og:description" content="${esc(opts.description)}" />
 <meta property="og:type" content="website" />
 <meta property="og:url" content="${esc(opts.canonical)}" />
-<meta property="og:image" content="${SITE}/og.png" />
+<meta property="og:image" content="${esc(image)}" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
 <meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:image" content="${esc(image)}" />
 <meta name="theme-color" content="#FBFBFA" media="(prefers-color-scheme: light)" />
 <meta name="theme-color" content="#070809" media="(prefers-color-scheme: dark)" />
 <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
@@ -185,6 +189,7 @@ export async function renderProviderPage(env: Env, provider: Provider): Promise<
     canonical,
     jsonld,
     body,
+    image: `${SITE}/og/${provider.id}.png`,
   });
 }
 
@@ -236,6 +241,7 @@ export async function renderDirectory(env: Env): Promise<string> {
     canonical: SITE + "/status",
     jsonld: [breadcrumb, collection],
     body,
+    image: `${SITE}/og/default.png`,
   });
 }
 
