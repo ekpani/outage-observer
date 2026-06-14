@@ -14,7 +14,45 @@ body {
 }
 .mono { font-family: var(--oo-font-mono); letter-spacing: var(--oo-tracking-mono); }
 
-.wrap { max-width: 860px; margin: 0 auto; padding: var(--oo-space-12) var(--oo-space-4) var(--oo-space-16); }
+.wrap { max-width: 860px; margin: 0 auto; padding: var(--oo-space-12) var(--oo-space-4) var(--oo-space-16); position: relative; }
+
+/* ---- Background radar scope (decorative). Fixed and viewport-centered, painted
+   behind all content; the opaque board sits on top as a safezone, so the sweep
+   only shows in the margins around it. Tied to the operational green, very faint,
+   and frozen by the global prefers-reduced-motion rule in tokens.css. ---- */
+.radar {
+  --radar-line: color-mix(in srgb, var(--oo-status-operational-fg) 7%, transparent);
+  --radar-sweep: color-mix(in srgb, var(--oo-status-operational-fg) 16%, transparent);
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: 134vmax;
+  height: 134vmax;
+  transform: translate(-50%, -50%);
+  z-index: -1;
+  pointer-events: none;
+  border-radius: 50%;
+  background:
+    linear-gradient(var(--radar-line), var(--radar-line)) center / 1px 100% no-repeat,
+    linear-gradient(var(--radar-line), var(--radar-line)) center / 100% 1px no-repeat,
+    repeating-radial-gradient(circle at center, var(--radar-line) 0 1px, transparent 1px 6vmax);
+  -webkit-mask: radial-gradient(circle at center, #000 0%, #000 24%, transparent 64%);
+  mask: radial-gradient(circle at center, #000 0%, #000 24%, transparent 64%);
+}
+.radar-sweep {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg,
+    var(--radar-sweep) 0deg,
+    color-mix(in srgb, var(--radar-sweep) 35%, transparent) 16deg,
+    transparent 46deg,
+    transparent 360deg);
+  animation: radar-spin 11s linear infinite;
+}
+@keyframes radar-spin {
+  to { transform: rotate(360deg); }
+}
 
 /* ---- Board panel ---- */
 .board {
