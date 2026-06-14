@@ -8,6 +8,8 @@ import { handleSeo } from "./seo";
 import { detectWebhookKind, sendWebhookConfirmation } from "./channels";
 import { CATALOG } from "./catalog";
 
+const PROVIDER_IDS = new Set(CATALOG.map((p) => p.id));
+
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -93,7 +95,7 @@ export default {
       }
       const valid = new Set(CATALOG.map((p) => p.id));
       const providers = Array.isArray(body?.providers) ? (body.providers as unknown[]).map(String).filter((x) => valid.has(x)) : [];
-      if (!providers.length) return json({ error: "Add at least one service to My Stack first." }, 400);
+      if (!providers.length) return json({ error: "Start observing at least one service first." }, 400);
 
       const { id, token } = await upsertTarget(env, "webpush", endpoint, JSON.stringify({ p256dh, auth }));
       await setTargetSubs(env, id, providers);
@@ -108,7 +110,7 @@ export default {
     }
 
     // Connect a Slack/Discord incoming webhook to a set of providers (the
-    // caller's "My Stack"). POSTed from the board, same-origin (no CORS needed).
+    // services the caller is observing). POSTed from the board, same-origin.
     if (url.pathname === "/api/webhook/subscribe" && request.method === "POST") {
       let body: { url?: string; providers?: unknown };
       try { body = await request.json(); } catch { return json({ error: "Bad JSON." }, 400); }
@@ -117,7 +119,7 @@ export default {
       if (!kind) return json({ error: "Unrecognized URL. Paste a Slack or Discord incoming-webhook URL." }, 400);
       const valid = new Set(CATALOG.map((p) => p.id));
       const providers = Array.isArray(body?.providers) ? (body.providers as unknown[]).map(String).filter((x) => valid.has(x)) : [];
-      if (!providers.length) return json({ error: "Add at least one service to My Stack first." }, 400);
+      if (!providers.length) return json({ error: "Start observing at least one service first." }, 400);
 
       const { id, token } = await upsertTarget(env, kind, hookUrl, null);
       await setTargetSubs(env, id, providers);
@@ -181,6 +183,16 @@ export default {
     if (url.pathname === "/debug/poll" && (await safeEqual(url.searchParams.get("key") ?? "", env.DEBUG_KEY))) {
       const n = await poll(env, Date.now());
       return new Response(`polled one shard, ${n} transition(s)`);
+    }
+
+    // Short, shareable provider URLs: /stripe -> /status/stripe (301). Static
+    // assets and all routes above are handled first, so this only catches a
+    // single path segment that is a known provider id.
+    if (request.method === "GET") {
+      const seg = url.pathname.slice(1);
+      if (/^[a-z0-9-]+$/.test(seg) && PROVIDER_IDS.has(seg)) {
+        return Response.redirect(new URL(`/status/${seg}`, url.origin).toString(), 301);
+      }
     }
 
     return new Response("not found", { status: 404 });

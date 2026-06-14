@@ -174,9 +174,10 @@ export const POPULAR_IDS: string[] = [
   "cloudflare", "aws", "github", "vercel", "openai", "anthropic", "stripe", "slack",
 ];
 
-/** Display order for the board and the bot's onboarding picker. */
+/** Display order for the board, the directory, and the bot's onboarding picker.
+ *  Ordered by how much people tend to care: cloud + AI lead. */
 export const CATEGORY_ORDER: string[] = [
-  "Cloud & hosting", "Dev & CI", "Data & backend", "Payments", "Comms",
-  "Auth & identity", "AI & model providers", "Collaboration", "CDN & edge",
+  "Cloud & hosting", "AI & model providers", "Dev & CI", "Data & backend",
+  "Payments", "Comms", "CDN & edge", "Auth & identity", "Collaboration",
   "Monitoring", "Commerce & CMS", "Analytics",
 ];

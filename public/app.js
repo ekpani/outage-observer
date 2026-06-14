@@ -1,11 +1,11 @@
 // Outage Observer — board renderer. Fetches the Worker's /api/status snapshot
-// and renders a personal board. "My Stack" is localStorage-only (no auth):
+// and renders a personal board. "Observing" (the services you track) is localStorage-only (no auth):
 // pick the services you depend on, the top banner is scoped to just those, and
 // the full catalog stays one tap away for adding more or browsing.
 
 const CATEGORY_ORDER = [
-  "Cloud & hosting", "Dev & CI", "Data & backend", "Payments", "Comms",
-  "Auth & identity", "AI & model providers", "Collaboration", "CDN & edge",
+  "Cloud & hosting", "AI & model providers", "Dev & CI", "Data & backend",
+  "Payments", "Comms", "CDN & edge", "Auth & identity", "Collaboration",
   "Monitoring", "Commerce & CMS", "Analytics",
 ];
 
@@ -97,8 +97,8 @@ function rowHtml(p, stack, mode) {
   // On the board, every row is yours, so the control is an explicit Remove (×).
   // In the picker it's an add / added toggle.
   const control = mode === "board"
-    ? `<button class="pin remove" data-id="${esc(p.id)}" aria-label="Remove ${esc(p.name)} from your board" title="Remove from board">${X}</button>`
-    : `<button class="pin ${pinned ? "pinned" : ""}" data-id="${esc(p.id)}" aria-pressed="${pinned}" aria-label="${pinned ? "Remove from" : "Add to"} board" title="${pinned ? "Remove from" : "Add to"} board">${pinned ? STAR : PLUS}</button>`;
+    ? `<button class="pin remove" data-id="${esc(p.id)}" aria-label="Stop observing ${esc(p.name)}" title="Stop observing">${X}</button>`
+    : `<button class="pin ${pinned ? "pinned" : ""}" data-id="${esc(p.id)}" aria-pressed="${pinned}" aria-label="${pinned ? "Stop observing" : "Observe"} ${esc(p.name)}" title="${pinned ? "Stop observing" : "Observe"}">${pinned ? STAR : PLUS}</button>`;
   return `<div class="row ${pinned ? "added" : ""}" data-name="${esc(p.name.toLowerCase())}">`
     + `<a class="row-main" href="${href}">`
     + logoTile(p)
@@ -124,8 +124,8 @@ function scopedSummary(tracked, checked) {
 
   if (!bad.length) {
     const sub = known.length
-      ? `${tracked.length} service${tracked.length > 1 ? "s" : ""} watched · checked ${time}`
-      : `checking your stack · ${time}`;
+      ? `observing ${tracked.length} service${tracked.length > 1 ? "s" : ""} · checked ${time}`
+      : `observing ${tracked.length} service${tracked.length > 1 ? "s" : ""} · checking…`;
     const title = known.length ? "All clear" : "Getting first reading";
     return '<div class="summary">'
       + `<div class="tile status-operational">${glyph("operational", 18)}</div>`
@@ -151,7 +151,7 @@ function boardHtml(providers, stack, checked) {
     .sort((a, b) => SEV[b.level] - SEV[a.level] || a.name.localeCompare(b.name));
 
   let html = scopedSummary(tracked, checked);
-  html += `<div class="cat mystack"><span class="star">${STAR}</span><span class="label">My Stack</span><span class="count mono">${tracked.length}</span><span class="rule"></span></div>`;
+  html += `<div class="cat mystack"><span class="star">${STAR}</span><span class="label">Observing</span><span class="count mono">${tracked.length}</span><span class="rule"></span></div>`;
   html += tracked.map((p) => rowHtml(p, stack, "board")).join("");
 
   const elsewhere = providers.filter((p) => !stack.has(p.id) && needsAttention(p)).length;
@@ -169,16 +169,16 @@ function browseHtml(providers, stack, checked) {
 
   let head = '<div class="pick-head">';
   if (onboarding) {
-    head += '<div class="ph-title">Build your board</div>'
+    head += '<div class="ph-title">Start observing</div>'
       + '<div class="ph-sub">Search for the services your product depends on, or tap a popular one to start. Outage Observer watches just those and stays quiet about the rest.</div>';
   } else {
     head += '<div class="ph-title">Add services</div>'
       + '<div class="ph-sub">Search by name, or tap to add. Your picks stay on this device.</div>'
       + '<div class="ph-actions">'
-      + `<button class="btn btn-primary" data-act="board">View my board (${stack.size}) ${ARROW}</button>`
+      + `<button class="btn btn-primary" data-act="board">View board (${stack.size}) ${ARROW}</button>`
       + '</div>';
   }
-  // Individual popular quick-adds (only the ones not already on your board).
+  // Individual popular quick-adds (only the ones not already observed).
   const pop = POPULAR.map((id) => providers.find((p) => p.id === id)).filter((p) => p && !stack.has(p.id));
   if (pop.length) {
     head += '<div class="popular"><span class="pl-label mono">Popular</span>'
@@ -302,7 +302,7 @@ document.addEventListener("click", (e) => {
 });
 document.getElementById("filter").addEventListener("input", applyFilter);
 
-// Connect a Slack/Discord incoming webhook to the current My Stack.
+// Connect a Slack/Discord incoming webhook to the services you're observing.
 async function connectWebhook() {
   const input = document.getElementById("hook-url");
   const msg = document.getElementById("hook-msg");
@@ -311,7 +311,7 @@ async function connectWebhook() {
   const providers = [...getStack()];
   const setMsg = (t, cls) => { msg.textContent = t; msg.className = "notify-msg" + (cls ? " " + cls : ""); };
   if (!url) return setMsg("Paste a Slack or Discord webhook URL first.", "err");
-  if (!providers.length) return setMsg("Add services to My Stack first.", "err");
+  if (!providers.length) return setMsg("Start observing some services first.", "err");
   setMsg("Connecting…");
   btn.disabled = true;
   try {
@@ -363,7 +363,7 @@ async function enablePush() {
   const state = document.getElementById("push-state");
   const set = (t) => { if (state) state.textContent = t; };
   const providers = [...getStack()];
-  if (!providers.length) return set("add services to My Stack first");
+  if (!providers.length) return set("start observing some services first");
 
   // iOS/iPadOS only allow web push from a Home-Screen web app, not a Safari tab.
   const standalone = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
@@ -415,7 +415,7 @@ async function disablePush() {
   localStorage.removeItem(PUSH_TOKEN_KEY);
   refreshPushUI();
 }
-// Keep the server's provider set in sync with My Stack when push is on.
+// Keep the server's provider set in sync with what you're observing when push is on.
 async function syncPushIfEnabled() {
   if (localStorage.getItem(PUSH_ON_KEY) !== "1" || !pushSupported()) return;
   try {
