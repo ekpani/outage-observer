@@ -55,8 +55,15 @@ export default {
       return new Response("ok");
     }
 
-    // Push ingest: a provider's status-page webhook pings us; we re-fetch + apply.
-    if (url.pathname.startsWith("/ingest/") && request.method === "POST") {
+    // Push ingest: a provider's status-page webhook POSTs here; we re-fetch + apply.
+    if (url.pathname.startsWith("/ingest/")) {
+      if (request.method !== "POST") {
+        // Friendly note for anyone opening this in a browser (a GET).
+        return new Response(
+          "Outage Observer ingest endpoint. Status-page webhooks POST here; there is nothing to see via GET.",
+          { status: 200, headers: { "content-type": "text/plain; charset=utf-8" } },
+        );
+      }
       const secret = request.headers.get("x-ingest-secret") ?? url.searchParams.get("secret") ?? "";
       if (!(await safeEqual(secret, env.INGEST_SECRET))) {
         return new Response("forbidden", { status: 403 });
