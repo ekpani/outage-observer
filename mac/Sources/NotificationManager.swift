@@ -12,8 +12,16 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
         UNUserNotificationCenter.current().delegate = self
     }
 
-    func requestAuthorization() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+    func requestAuthorization(_ completion: @escaping (Bool) -> Void = { _ in }) {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, _ in
+            DispatchQueue.main.async { completion(granted) }
+        }
+    }
+
+    func isAuthorized(_ completion: @escaping (Bool) -> Void) {
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            DispatchQueue.main.async { completion(settings.authorizationStatus == .authorized) }
+        }
     }
 
     func notify(provider: Provider, to level: Level) {

@@ -6,6 +6,8 @@ import SwiftUI
 /// services. @MainActor so all @Published mutations are on the main thread.
 @MainActor
 final class StatusStore: ObservableObject {
+    static let shared = StatusStore()
+
     @Published var providers: [Provider] = []
     @Published var checkedAt: Date?
     @Published var loading = false
@@ -15,7 +17,10 @@ final class StatusStore: ObservableObject {
         didSet { UserDefaults.standard.set(Array(observing), forKey: "observing") }
     }
     @Published var notificationsEnabled: Bool {
-        didSet { UserDefaults.standard.set(notificationsEnabled, forKey: "notificationsEnabled") }
+        didSet {
+            UserDefaults.standard.set(notificationsEnabled, forKey: "notificationsEnabled")
+            if notificationsEnabled { NotificationManager.shared.requestAuthorization() }
+        }
     }
     @Published var interval: Double {
         didSet { UserDefaults.standard.set(interval, forKey: "interval"); restartTimer() }
@@ -24,7 +29,7 @@ final class StatusStore: ObservableObject {
     private var lastLevels: [String: Level] = [:]
     private var timer: Timer?
 
-    init() {
+    private init() {
         let d = UserDefaults.standard
         if let saved = d.array(forKey: "observing") as? [String] {
             observing = Set(saved)
@@ -34,7 +39,8 @@ final class StatusStore: ObservableObject {
         notificationsEnabled = (d.object(forKey: "notificationsEnabled") as? Bool) ?? true
         interval = (d.object(forKey: "interval") as? Double) ?? 60
 
-        NotificationManager.shared.requestAuthorization()
+        // Notification permission is requested contextually during onboarding,
+        // not cold on launch.
         Task { await refresh() }
         restartTimer()
     }

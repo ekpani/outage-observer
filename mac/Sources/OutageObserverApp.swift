@@ -3,7 +3,8 @@ import CoreText
 
 @main
 struct OutageObserverApp: App {
-    @StateObject private var store = StatusStore()
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    @StateObject private var store = StatusStore.shared
 
     init() {
         // Register the bundled Departure Mono so Font.custom resolves it.

@@ -80,15 +80,15 @@ struct Aperture: View {
     }
 }
 
-/// Menu-bar icon: monochrome ring that adapts to the bar, pupil tinted by the
-/// worst observed status (green when all clear, red when something's down).
+/// Menu-bar icon. A reticle symbol tinted by the worst observed status (green
+/// when all clear, amber/red when something's wrong). Using an explicit
+/// saturated colour keeps it visible on BOTH light and dark menu bars — a
+/// custom shape with `Color.primary` renders white and vanishes on a light bar.
 struct MenuBarLabel: View {
     let worst: Level
     var body: some View {
-        ZStack {
-            Circle().stroke(Color.primary, lineWidth: 1.5).frame(width: 14, height: 14)
-            Circle().fill(Theme.status(worst)).frame(width: 6, height: 6)
-        }
-        .frame(width: 18, height: 18)
+        Image(systemName: "dot.scope")
+            .symbolRenderingMode(.monochrome)
+            .foregroundStyle(Theme.status(worst))
     }
 }

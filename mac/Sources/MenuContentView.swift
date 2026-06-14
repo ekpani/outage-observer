@@ -26,7 +26,7 @@ struct MenuContentView: View {
             Text("outage.observer").font(.mono(13)).foregroundStyle(Theme.textSecondary)
             Spacer()
             iconButton("arrow.clockwise") { Task { await store.refresh() } }
-            iconButton("gearshape") { openSettings() }
+            settingsButton
             iconButton("macwindow") { openMain() }
         }
         .padding(.horizontal, 12).padding(.vertical, 10)
@@ -95,13 +95,22 @@ struct MenuContentView: View {
         .buttonStyle(.plain)
     }
 
+    @ViewBuilder private var settingsButton: some View {
+        if #available(macOS 14, *) {
+            SettingsLink {
+                Image(systemName: "gearshape").font(.system(size: 12)).foregroundStyle(Theme.textMuted).frame(width: 22, height: 22)
+            }
+            .buttonStyle(.plain)
+        } else {
+            iconButton("gearshape") {
+                NSApp.activate(ignoringOtherApps: true)
+                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+            }
+        }
+    }
+
     private func openMain() {
         openWindow(id: "main")
         NSApp.activate(ignoringOtherApps: true)
-    }
-
-    private func openSettings() {
-        NSApp.activate(ignoringOtherApps: true)
-        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
     }
 }
