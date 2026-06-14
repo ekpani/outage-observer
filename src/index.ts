@@ -64,13 +64,15 @@ export default {
           { status: 200, headers: { "content-type": "text/plain; charset=utf-8" } },
         );
       }
-      const secret = request.headers.get("x-ingest-secret") ?? url.searchParams.get("secret") ?? "";
+      // Secret can be a path segment (/ingest/<id>/<secret> — cleanest, no query
+      // string that some webhook forms reject), a ?secret= query, or a header.
+      const [providerId, pathSecret] = url.pathname.slice("/ingest/".length).split("/");
+      const secret = pathSecret ?? request.headers.get("x-ingest-secret") ?? url.searchParams.get("secret") ?? "";
       if (!(await safeEqual(secret, env.INGEST_SECRET))) {
         return new Response("forbidden", { status: 403 });
       }
-      const providerId = url.pathname.slice("/ingest/".length);
       try {
-        return await handleIngest(env, providerId);
+        return await handleIngest(env, providerId ?? "");
       } catch (err) {
         console.error("ingest failed", { error: String(err) });
         return new Response("ok"); // ack so the sender does not retry-storm
