@@ -28,7 +28,7 @@
     {
       "binding": "DB",
       "database_name": "outage-observer",
-      "database_id": "PLACEHOLDER_RUN_D1_CREATE"
+      "database_id": "cc4e38af-9824-4eed-96ae-8cca1d97cd5e"
     }
   ]
 }
