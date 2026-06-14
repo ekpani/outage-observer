@@ -181,14 +181,17 @@ async function handleMessage(env: Env, message: any): Promise<void> {
       await sendMessage(env, chatId, "Paused. You won't get any pings. /start to set up again.");
       break;
     case "/test":
+      // A fictional provider, clearly labelled, so a test can never be mistaken
+      // for a real incident. Real alerts only ever come from real transitions.
       await sendMessage(
         env,
         chatId,
-        formatAlert("OpenAI", "operational", "major_outage", {
-          level: "major_outage",
-          description: "Sample alert",
-          incidents: [{ name: "This is a test incident", impact: "major", status: "investigating" }],
-        }),
+        "🧪 <b>Test alert</b>. A sample so you can see the format. This is not a real incident.\n\n" +
+          formatAlert("Example Service", "operational", "major_outage", {
+            level: "major_outage",
+            description: "",
+            incidents: [{ name: "Sample incident (test only)", impact: "major", status: "investigating" }],
+          }),
       );
       break;
     default:

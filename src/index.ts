@@ -1,6 +1,6 @@
-import { poll, formatAlert } from "./poller";
-import { getBoard, getUsers } from "./store";
-import { sendMessage, type Env } from "./telegram";
+import { poll } from "./poller";
+import { getBoard } from "./store";
+import { type Env } from "./telegram";
 import { onUpdate } from "./bot";
 import { handleIngest } from "./ingest";
 
@@ -74,25 +74,6 @@ export default {
     if (url.pathname === "/debug/poll" && (await safeEqual(url.searchParams.get("key") ?? "", env.DEBUG_KEY))) {
       const n = await poll(env, Date.now());
       return new Response(`polled one shard, ${n} transition(s)`);
-    }
-
-    // Debug: push a sample alert to every user so you can confirm delivery.
-    if (url.pathname === "/debug/alert" && (await safeEqual(url.searchParams.get("key") ?? "", env.DEBUG_KEY))) {
-      const text = formatAlert("OpenAI", "operational", "major_outage", {
-        level: "major_outage",
-        description: "Elevated error rates",
-        incidents: [
-          {
-            name: "Elevated errors on the API",
-            impact: "major",
-            status: "investigating",
-            url: "https://status.openai.com",
-          },
-        ],
-      });
-      const users = await getUsers(env);
-      for (const chatId of users) await sendMessage(env, chatId, text);
-      return new Response(`sent sample alert to ${users.length} user(s)`);
     }
 
     return new Response("not found", { status: 404 });
