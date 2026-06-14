@@ -3,7 +3,8 @@
 
 const CATEGORY_ORDER = [
   "Cloud & hosting", "Dev & CI", "Data & backend", "Payments", "Comms",
-  "Auth & identity", "AI & model providers", "Collaboration", "CDN & edge", "Monitoring",
+  "Auth & identity", "AI & model providers", "Collaboration", "CDN & edge",
+  "Monitoring", "Commerce & CMS", "Analytics",
 ];
 
 const LABELS = {
@@ -53,11 +54,14 @@ function rowHtml(p, stack) {
   const incident = p.incident && p.incident.name
     ? `<span class="incident" title="${esc(p.incident.name)}">${esc(p.incident.name)}</span>`
     : '<span class="incident"></span>';
+  const href = p.home ? esc(p.home) : "#";
   return `<div class="row" data-name="${esc(p.name.toLowerCase())}">`
-    + `<div class="logo">${esc(initial)}</div>`
+    + `<a class="row-main" href="${href}" target="_blank" rel="noopener noreferrer">`
+    + `<span class="logo">${esc(initial)}</span>`
     + `<span class="name">${esc(p.name)}</span>`
     + badge(p.level)
     + incident
+    + `</a>`
     + `<button class="pin ${pinned ? "pinned" : ""}" data-id="${esc(p.id)}" aria-pressed="${pinned}" aria-label="${pinned ? "Remove from" : "Add to"} My Stack" title="${pinned ? "Remove from" : "Add to"} My Stack">${STAR}</button>`
     + `</div>`;
 }

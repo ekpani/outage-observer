@@ -77,18 +77,25 @@ body {
 .cat .rule { flex: 1; height: 1px; background: var(--oo-border); }
 .hint { padding: 12px 22px; color: var(--oo-text-muted); font-size: 12px; }
 
-/* ---- Service row ---- */
-.row { display: flex; align-items: center; gap: var(--oo-space-3); padding: 13px 22px; border-top: 1px solid var(--oo-border); }
+/* ---- Service row (the main area is a link to the status page) ---- */
+.row { display: flex; align-items: center; border-top: 1px solid var(--oo-border); }
 .cat + .row { border-top: none; }
+.row:hover { background: var(--oo-bg-sunken); }
+.row-main {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--oo-space-3);
+  padding: 13px 12px 13px 22px; text-decoration: none; color: inherit;
+}
+.row-main:focus-visible { box-shadow: inset 0 0 0 2px var(--oo-focus-ring); outline: none; }
 .row .logo {
   width: 28px; height: 28px; border-radius: 7px; flex: none;
-  background: var(--oo-bg-sunken); border: 1px solid var(--oo-border);
+  background: var(--oo-bg-elevated); border: 1px solid var(--oo-border-strong);
   display: grid; place-items: center;
   font-family: var(--oo-font-mono); font-size: 12px; color: var(--oo-text-secondary);
 }
 .row .name { font-family: var(--oo-font-mono); font-size: 14px; color: var(--oo-text-primary); letter-spacing: var(--oo-tracking-mono); min-width: 140px; flex: none; }
+.row-main:hover .name { color: var(--oo-accent); }
 .row .incident { font-size: 13px; color: var(--oo-text-secondary); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.row .pin { background: none; border: none; cursor: pointer; color: var(--oo-text-muted); padding: 4px; display: grid; place-items: center; border-radius: var(--oo-radius-sm); flex: none; }
+.row .pin { background: none; border: none; cursor: pointer; color: var(--oo-text-muted); padding: 8px; margin-right: 14px; display: grid; place-items: center; border-radius: var(--oo-radius-sm); flex: none; }
 .row .pin:hover { color: var(--oo-text-secondary); }
 .row .pin.pinned { color: var(--oo-accent); }
 .row .pin:focus-visible { box-shadow: 0 0 0 3px var(--oo-focus-ring); outline: none; }
@@ -123,8 +130,18 @@ body {
 .row.skel .logo { border: none; }
 @keyframes oo-shimmer { to { background-position: -200% 0; } }
 
-@media (max-width: 560px) {
-  .row .name { min-width: 92px; }
+@media (max-width: 600px) {
+  .wrap { padding: var(--oo-space-6) var(--oo-space-3) var(--oo-space-12); }
+  .board-header { flex-wrap: wrap; row-gap: var(--oo-space-2); padding: var(--oo-space-3) var(--oo-space-4); }
+  .board-header .spacer { display: none; }
+  .updated { display: none; }
+  .filter { flex: 1; min-width: 0; width: auto; }
+  .summary { padding: 16px 14px; gap: var(--oo-space-3); }
+  .summary .s-title { font-size: 16px; }
+  .summary .s-sub { font-size: 11px; }
+  .cat { padding: 14px 14px 8px; }
+  .row-main { padding: 12px 8px 12px 14px; gap: var(--oo-space-2); }
+  .row .name { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .row .incident { display: none; }
-  .filter { width: 80px; }
+  .row .pin { margin-right: 8px; }
 }

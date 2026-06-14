@@ -11,6 +11,7 @@ export interface BoardEntry {
   category: string;
   level: Level;
   description: string;
+  home: string;
   incident?: { name: string; url?: string };
 }
 

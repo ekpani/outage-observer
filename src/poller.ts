@@ -18,6 +18,7 @@ function toEntry(provider: Provider, status: ProviderStatus): BoardEntry {
     category: provider.category,
     level: status.level,
     description: status.description,
+    home: provider.link ?? provider.url,
   };
   const top = status.incidents[0];
   if (top) entry.incident = { name: top.name, url: top.url };
