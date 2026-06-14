@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "outage-observer",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-06-01",
+  "observability": { "enabled": true },
+  // Polls every minute. Status is global, so each source is fetched once
+  // per tick regardless of how many subscribers there are.
+  "triggers": {
+    "crons": ["* * * * *"]
+  },
+  // Run `npx wrangler kv namespace create STATUS_KV` and paste the id here.
+  "kv_namespaces": [
+    {
+      "binding": "STATUS_KV",
+      "id": "REPLACE_WITH_KV_ID"
+    }
+  ]
+}

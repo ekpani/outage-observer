@@ -1,0 +1,4 @@
+# Copy to .dev.vars for local `wrangler dev` (gitignored).
+BOT_TOKEN=123456:your-botfather-token
+WEBHOOK_SECRET=some-long-random-string
+DEBUG_KEY=another-random-string
