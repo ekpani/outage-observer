@@ -66,9 +66,9 @@ function rowHtml(p, stack) {
     + `</div>`;
 }
 
-function summaryHtml(providers, updated) {
+function summaryHtml(providers, checked) {
   const total = providers.length;
-  const time = updated ? hhmm(updated) + " UTC" : "—";
+  const time = checked ? hhmm(checked) + " UTC" : "—";
   const bad = providers.filter((p) => p.level !== "operational" && p.level !== "unknown");
   if (!bad.length) {
     return '<div class="summary">'
@@ -112,13 +112,13 @@ function render() {
   if (!BOARD) { body.innerHTML = skeleton(); return; }
 
   const providers = BOARD.providers || [];
-  const updated = BOARD.updatedAt ? new Date(BOARD.updatedAt) : null;
-  updEl.textContent = updated ? "updated " + hhmm(updated) + " UTC" : "";
+  const checked = BOARD.checkedAt ? new Date(BOARD.checkedAt) : (BOARD.updatedAt ? new Date(BOARD.updatedAt) : null);
+  updEl.textContent = checked ? "checked " + hhmm(checked) + " UTC" : "";
 
   if (!providers.length) { body.innerHTML = noData(); return; }
 
   const stack = getStack();
-  let html = summaryHtml(providers, updated);
+  let html = summaryHtml(providers, checked);
 
   // My Stack (pinned, localStorage)
   const mine = providers.filter((p) => stack.has(p.id));

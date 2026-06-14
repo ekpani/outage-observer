@@ -166,3 +166,23 @@ export async function recordHistory(
     .bind(providerId, level, at)
     .run();
 }
+
+// ---------- Meta (D1 key/value) ----------
+//
+// "Last checked" updates every poll, which would blow KV's 1,000 writes/day, so
+// it lives in D1 (100k/day). Lets the board show a fresh "checked <time>"
+// distinct from the board's updatedAt (which is only the last content change).
+
+export async function setCheckedAt(env: Env, ms: number): Promise<void> {
+  await env.DB
+    .prepare("INSERT INTO meta (key, value) VALUES ('checked_at', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+    .bind(String(ms))
+    .run();
+}
+
+export async function getCheckedAt(env: Env): Promise<number | null> {
+  const row = await env.DB
+    .prepare("SELECT value FROM meta WHERE key = 'checked_at'")
+    .first<{ value: string }>();
+  return row ? Number(row.value) : null;
+}

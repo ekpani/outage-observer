@@ -47,3 +47,11 @@ CREATE TABLE IF NOT EXISTS history (
 
 -- Per-provider timeline lookups for uptime / incident queries.
 CREATE INDEX IF NOT EXISTS idx_history_provider_at ON history (provider_id, at);
+
+-- Small key/value table for poll metadata, e.g. the last-checked timestamp, so
+-- the board can show "checked <fresh>" without a per-minute KV write (the board
+-- itself is only rewritten on change).
+CREATE TABLE IF NOT EXISTS meta (
+  key   TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);

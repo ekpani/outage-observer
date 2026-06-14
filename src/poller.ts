@@ -1,6 +1,6 @@
 import { CATALOG, PRIORITY_IDS, type Provider } from "./catalog";
 import { fetchStatus, SEVERITY, type Level, type ProviderStatus } from "./adapters";
-import { getBoard, setBoard, enqueueNotification, drainOutbox, recordHistory, type Board, type BoardEntry } from "./store";
+import { getBoard, setBoard, enqueueNotification, drainOutbox, recordHistory, setCheckedAt, type Board, type BoardEntry } from "./store";
 import { type Env } from "./telegram";
 import { EMOJI, LABEL } from "./labels";
 
@@ -51,7 +51,9 @@ export async function poll(env: Env, nowMs: number): Promise<number> {
     }),
   );
 
-  return applyResults(env, fetched);
+  const transitions = await applyResults(env, fetched);
+  await setCheckedAt(env, nowMs);
+  return transitions;
 }
 
 /**

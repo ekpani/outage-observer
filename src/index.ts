@@ -1,5 +1,5 @@
 import { poll } from "./poller";
-import { getBoard } from "./store";
+import { getBoard, getCheckedAt } from "./store";
 import { type Env } from "./telegram";
 import { onUpdate } from "./bot";
 import { handleIngest } from "./ingest";
@@ -25,8 +25,13 @@ export default {
       if (hit) return hit;
 
       const board = await getBoard(env);
+      const checkedAt = await getCheckedAt(env);
       const res = new Response(
-        JSON.stringify(board ?? { updatedAt: null, providers: [] }),
+        JSON.stringify({
+          updatedAt: board?.updatedAt ?? null,
+          checkedAt,
+          providers: board?.providers ?? [],
+        }),
         {
           headers: {
             "content-type": "application/json; charset=utf-8",
