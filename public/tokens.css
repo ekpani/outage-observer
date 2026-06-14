@@ -25,10 +25,10 @@
   --oo-focus-ring:        rgba(26,127,55,.45);
 
   /* ---- Surfaces ---- */
-  --oo-bg-page:           #FBFBFA;   /* viewport background        */
+  --oo-bg-page:           #ECEBE7;   /* viewport background (calm warm off-white; white cards pop) */
   --oo-bg-surface:        #FFFFFF;   /* cards, rows, panels        */
   --oo-bg-elevated:       #FFFFFF;   /* popovers/menus (+ shadow)  */
-  --oo-bg-sunken:         #F4F4F3;   /* wells, code, track         */
+  --oo-bg-sunken:         #F1F0ED;   /* wells, code, track         */
 
   /* ---- Text ---- */
   --oo-text-primary:      #16181B;

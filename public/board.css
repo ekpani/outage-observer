@@ -36,9 +36,11 @@ body {
    there, fading out only near the far corner. Tied to the operational green,
    very faint, and frozen by the global prefers-reduced-motion rule. ---- */
 .radar {
-  --radar-line: color-mix(in srgb, var(--oo-status-operational-fg) 8%, transparent);
-  --radar-sweep: color-mix(in srgb, var(--oo-status-operational-fg) 15%, transparent);
-  --radar-pupil: color-mix(in srgb, var(--oo-status-operational-fg) 26%, transparent);
+  /* Light theme (default): the operational green is dark, so it needs more
+     opacity to read on the light page. Dark theme overrides below. */
+  --radar-line: color-mix(in srgb, var(--oo-status-operational-fg) 17%, transparent);
+  --radar-sweep: color-mix(in srgb, var(--oo-status-operational-fg) 26%, transparent);
+  --radar-pupil: color-mix(in srgb, var(--oo-status-operational-fg) 40%, transparent);
   --ox: 84%;   /* origin: lower-right beacon */
   --oy: 78%;
   position: fixed;
@@ -76,6 +78,19 @@ body {
 }
 @keyframes radar-spin {
   to { transform: rotate(360deg); }
+}
+/* Dark theme: the green is bright on near-black, so it needs much less opacity. */
+:root[data-theme="dark"] .radar {
+  --radar-line: color-mix(in srgb, var(--oo-status-operational-fg) 8%, transparent);
+  --radar-sweep: color-mix(in srgb, var(--oo-status-operational-fg) 15%, transparent);
+  --radar-pupil: color-mix(in srgb, var(--oo-status-operational-fg) 26%, transparent);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .radar {
+    --radar-line: color-mix(in srgb, var(--oo-status-operational-fg) 8%, transparent);
+    --radar-sweep: color-mix(in srgb, var(--oo-status-operational-fg) 15%, transparent);
+    --radar-pupil: color-mix(in srgb, var(--oo-status-operational-fg) 26%, transparent);
+  }
 }
 
 /* ---- Board panel ---- */
@@ -260,11 +275,18 @@ body[data-view="browse"] .row.added .row-main { box-shadow: inset 2px 0 0 var(--
 
 /* ---- Get-alerts panel (Slack/Discord webhook; web-push bell added alongside) ---- */
 .notify {
+  position: relative;
   margin-top: var(--oo-space-5);
   background: var(--oo-bg-surface); border: var(--oo-border-width) solid var(--oo-border);
   border-radius: var(--oo-radius-xl); padding: 18px 20px; box-shadow: var(--oo-shadow-sm);
 }
-.notify-title { font-weight: var(--oo-weight-semibold); font-size: 15px; }
+.notify-close {
+  position: absolute; top: 10px; right: 10px; background: none; border: none; cursor: pointer;
+  color: var(--oo-text-muted); font-size: 20px; line-height: 1; padding: 2px 8px;
+  border-radius: var(--oo-radius-sm);
+}
+.notify-close:hover { color: var(--oo-text-primary); background: var(--oo-bg-sunken); }
+.notify-title { font-weight: var(--oo-weight-semibold); font-size: 15px; padding-right: 28px; }
 .notify-sub { font-size: 12.5px; color: var(--oo-text-muted); margin-top: 4px; }
 .notify-row { display: flex; gap: 10px; margin-top: 14px; align-items: center; }
 .notify-label { font-size: 11px; color: var(--oo-text-muted); text-transform: uppercase; letter-spacing: .12em; margin-top: 18px; }
@@ -284,6 +306,49 @@ body[data-view="browse"] .row.added .row-main { box-shadow: inset 2px 0 0 var(--
   .notify { padding: 16px 14px; }
   .notify-row { flex-wrap: wrap; }
   .notify-row .btn { width: 100%; justify-content: center; }
+}
+
+/* ---- ⌘K hint chip (header) ---- */
+.kbd-hint {
+  display: inline-flex; align-items: center; flex: none; cursor: pointer;
+  background: var(--oo-bg-sunken); border: 1px solid var(--oo-border); border-radius: var(--oo-radius-md);
+  padding: 4px 8px; color: var(--oo-text-muted);
+}
+.kbd-hint:hover { color: var(--oo-text-secondary); border-color: var(--oo-border-strong); }
+.kbd-hint kbd { font-family: var(--oo-font-mono); font-size: 11px; letter-spacing: var(--oo-tracking-mono); }
+
+/* ---- Command palette (⌘K) ---- */
+.palette[hidden] { display: none; }
+.palette {
+  position: fixed; inset: 0; z-index: 50; display: flex; justify-content: center; align-items: flex-start;
+  padding: 12vh 16px 16px;
+  background: color-mix(in srgb, var(--oo-bg-page) 62%, transparent);
+  -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+}
+.palette-box {
+  width: min(560px, 100%); max-height: 76vh; display: flex; flex-direction: column; overflow: hidden;
+  background: var(--oo-bg-elevated); border: 1px solid var(--oo-border-strong);
+  border-radius: var(--oo-radius-xl); box-shadow: var(--oo-shadow-md);
+}
+.palette-input {
+  width: 100%; border: none; outline: none; background: none; color: var(--oo-text-primary);
+  font-family: var(--oo-font-mono); font-size: 15px; letter-spacing: var(--oo-tracking-mono);
+  padding: 16px 18px; border-bottom: 1px solid var(--oo-border);
+}
+.palette-input::placeholder { color: var(--oo-text-muted); }
+.palette-results { overflow-y: auto; padding: 6px; }
+.pal-item { display: flex; align-items: center; gap: 11px; padding: 9px 12px; border-radius: var(--oo-radius-md); cursor: pointer; }
+.pal-item.pal-sel { background: var(--oo-bg-sunken); }
+.pal-icon { width: 16px; display: grid; place-items: center; flex: none; color: var(--oo-text-muted); font-family: var(--oo-font-mono); }
+.pal-dot { width: 8px; height: 8px; border-radius: 999px; background: currentColor; }
+.pal-label { font-family: var(--oo-font-mono); font-size: 13px; letter-spacing: var(--oo-tracking-mono); color: var(--oo-text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pal-hint { margin-left: auto; font-family: var(--oo-font-mono); font-size: 11px; color: var(--oo-text-muted); letter-spacing: var(--oo-tracking-mono); flex: none; padding-left: 10px; }
+.pal-empty { padding: 18px; text-align: center; color: var(--oo-text-muted); font-family: var(--oo-font-mono); font-size: 12px; }
+.palette-foot { display: flex; gap: 16px; justify-content: center; padding: 9px; border-top: 1px solid var(--oo-border); color: var(--oo-text-muted); font-size: 11px; }
+.palette-foot kbd { border: 1px solid var(--oo-border); border-radius: 3px; padding: 0 4px; margin-right: 2px; }
+@media (max-width: 600px) {
+  .kbd-hint { display: none; }      /* no keyboard on phones */
+  .palette { padding-top: 8vh; }
 }
 
 /* ---- Footer ---- */
@@ -318,12 +383,9 @@ body[data-view="browse"] .row.added .row-main { box-shadow: inset 2px 0 0 var(--
   .row .name { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .row .incident { display: none; }
   .row .pin { margin-right: 8px; }
-  /* The board fills more of the screen on mobile, so boost intensity and keep
-     the rings opaque further out so the full-screen sweep still reads. */
+  /* The board fills more of the screen on mobile, so keep the rings opaque
+     further out (mask only — intensity stays theme-driven from above). */
   .radar {
-    --radar-line: color-mix(in srgb, var(--oo-status-operational-fg) 13%, transparent);
-    --radar-sweep: color-mix(in srgb, var(--oo-status-operational-fg) 28%, transparent);
-    --radar-pupil: color-mix(in srgb, var(--oo-status-operational-fg) 40%, transparent);
     -webkit-mask: radial-gradient(circle at var(--ox) var(--oy), #000 0%, #000 74%, transparent 100%);
     mask: radial-gradient(circle at var(--ox) var(--oy), #000 0%, #000 74%, transparent 100%);
   }

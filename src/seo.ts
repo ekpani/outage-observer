@@ -88,8 +88,8 @@ ${ld}
 </header>
 ${opts.body}
 <footer class="sp-foot">
-  <a href="/status">All providers</a> · <a href="/feed.xml">RSS</a> · <a href="https://t.me/outageobserverbot">Telegram</a><br/>
-  <a href="https://ekpani.com">an ekpani tool</a>
+  <a href="/status">All providers</a> · <a href="/feed.xml">RSS</a> · <a href="https://t.me/outageobserverbot" target="_blank" rel="noopener noreferrer">Telegram</a><br/>
+  <a href="https://ekpani.com" target="_blank" rel="noopener noreferrer">an ekpani tool</a>
 </footer>
 </div>
 </body>
@@ -137,7 +137,7 @@ export async function renderProviderPage(env: Env, provider: Provider): Promise<
 
   <section>
     <h2>About this page</h2>
-    <p>Outage Observer checks ${esc(provider.name)}'s official status source every minute and records when it changes state. This page reflects the latest known status; for the authoritative source see ${esc(provider.name)}'s <a href="${esc(official)}" target="_blank" rel="noopener nofollow">own status page</a>. Get notified of changes via the <a href="/">live board</a>, the <a href="https://t.me/outageobserverbot">Telegram bot</a>, or this provider's <a href="/feed/${provider.id}.xml">RSS feed</a>.</p>
+    <p>Outage Observer checks ${esc(provider.name)}'s official status source every minute and records when it changes state. This page reflects the latest known status; for the authoritative source see ${esc(provider.name)}'s <a href="${esc(official)}" target="_blank" rel="noopener nofollow">own status page</a>. Get notified of changes via the <a href="/">live board</a>, the <a href="https://t.me/outageobserverbot" target="_blank" rel="noopener noreferrer">Telegram bot</a>, or this provider's <a href="/feed/${provider.id}.xml">RSS feed</a>.</p>
   </section>
 
   ${related.length ? `<section>

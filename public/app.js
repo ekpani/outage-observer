@@ -52,6 +52,7 @@ const STACK_KEY = "oo-stack";
 const THEME_KEY = "oo-theme";
 const PUSH_ON_KEY = "oo-push-on";
 const PUSH_TOKEN_KEY = "oo-push-token";
+const NOTIFY_DISMISS_KEY = "oo-notify-dismissed";
 
 let BOARD = null;
 let VIEW = null;   // 'board' | 'browse'; null = decide from stack on first render
@@ -240,7 +241,8 @@ function render() {
   const rss2 = document.getElementById("rss-link2");
   if (rss2) rss2.href = rssHref;
   const notify = document.getElementById("notify");
-  if (notify) notify.hidden = stack.size === 0;   // connect alerts once you have a stack
+  // Show once you have a stack, unless you've dismissed it (footer "alerts" brings it back).
+  if (notify) notify.hidden = stack.size === 0 || localStorage.getItem(NOTIFY_DISMISS_KEY) === "1";
   if (VIEW === null) VIEW = stack.size ? "board" : "browse";
   if (stack.size === 0) VIEW = "browse";   // no stack -> always the picker
 
@@ -433,6 +435,128 @@ if (pushBtn) pushBtn.addEventListener("click", () => {
   if (localStorage.getItem(PUSH_ON_KEY) === "1") disablePush(); else enablePush();
 });
 refreshPushUI();
+
+// ---- Dismissable alerts panel ----
+const notifyClose = document.getElementById("notify-close");
+if (notifyClose) notifyClose.addEventListener("click", () => {
+  try { localStorage.setItem(NOTIFY_DISMISS_KEY, "1"); } catch {}
+  const n = document.getElementById("notify");
+  if (n) n.hidden = true;
+});
+const alertsLink = document.getElementById("alerts-link");
+if (alertsLink) alertsLink.addEventListener("click", (e) => {
+  e.preventDefault();
+  try { localStorage.removeItem(NOTIFY_DISMISS_KEY); } catch {}
+  render();
+  const n = document.getElementById("notify");
+  if (n && !n.hidden) n.scrollIntoView({ behavior: "smooth", block: "center" });
+});
+
+// ---- Responsive header search placeholder ----
+function setFilterPlaceholder() {
+  const f = document.getElementById("filter");
+  if (f) f.placeholder = window.innerWidth <= 560 ? "Search" : "Search services…";
+}
+setFilterPlaceholder();
+window.addEventListener("resize", setFilterPlaceholder);
+
+// ---- Command palette (⌘K) + keyboard shortcuts ----
+const IS_MAC = /Mac|iPhone|iPad|iPod/.test(navigator.platform || "") || /Mac/.test(navigator.userAgent);
+let palItems = [];
+let palSel = 0;
+
+function paletteEl() { return document.getElementById("palette"); }
+function paletteOpen() { const p = paletteEl(); return p && !p.hidden; }
+
+function commandList() {
+  return [
+    { kind: "cmd", label: "Browse all services", hint: "catalog", run: () => { closePalette(); setView("browse"); } },
+    { kind: "cmd", label: "My board", hint: "your stack", run: () => { closePalette(); setView("board"); } },
+    { kind: "cmd", label: "Enable browser alerts", hint: "web push", run: () => { closePalette(); enablePush(); } },
+    { kind: "cmd", label: "Toggle light / dark", hint: "theme", run: () => { toggleTheme(); } },
+    { kind: "cmd", label: "All providers", hint: "status directory", run: () => { location.href = "/status"; } },
+    { kind: "cmd", label: "Open RSS feed", hint: "atom", run: () => { const s = getStack(); location.href = s.size ? "/feed.xml?ids=" + [...s].join(",") : "/feed.xml"; } },
+  ];
+}
+
+function buildPaletteItems(query) {
+  const q = query.trim().toLowerCase();
+  const cmds = commandList();
+  if (!q) return cmds;
+  const cmdMatch = cmds.filter((c) => c.label.toLowerCase().includes(q));
+  const provs = (BOARD && BOARD.providers) || [];
+  const pMatch = provs
+    .filter((p) => p.name.toLowerCase().includes(q) || p.id.includes(q))
+    .sort((a, b) => (b.name.toLowerCase().startsWith(q) || b.id.startsWith(q) ? 0 : 1) - (a.name.toLowerCase().startsWith(q) || a.id.startsWith(q) ? 0 : 1) || a.name.localeCompare(b.name))
+    .slice(0, 8)
+    .map((p) => ({ kind: "prov", label: p.name, level: p.level, hint: LABELS[p.level] || "", run: () => { location.href = "/status/" + encodeURIComponent(p.id); } }));
+  return [...cmdMatch, ...pMatch];
+}
+
+function renderPalette() {
+  const box = document.getElementById("palette-results");
+  if (!box) return;
+  if (!palItems.length) { box.innerHTML = '<div class="pal-empty">No matches.</div>'; return; }
+  palSel = Math.max(0, Math.min(palItems.length - 1, palSel));
+  box.innerHTML = palItems.map((it, i) => {
+    const icon = it.kind === "prov"
+      ? `<span class="pal-icon" style="color:var(--oo-status-${it.level}-fg)"><span class="pal-dot"></span></span>`
+      : '<span class="pal-icon">›</span>';
+    return `<div class="pal-item${i === palSel ? " pal-sel" : ""}" role="option" data-i="${i}" aria-selected="${i === palSel}">`
+      + icon + `<span class="pal-label">${esc(it.label)}</span><span class="pal-hint">${esc(it.hint || "")}</span></div>`;
+  }).join("");
+  const sel = box.querySelector(".pal-sel");
+  if (sel) sel.scrollIntoView({ block: "nearest" });
+}
+
+function openPalette() {
+  const p = paletteEl();
+  if (!p) return;
+  p.hidden = false;
+  const input = document.getElementById("palette-input");
+  input.value = "";
+  palItems = buildPaletteItems("");
+  palSel = 0;
+  renderPalette();
+  input.focus();
+}
+function closePalette() { const p = paletteEl(); if (p) p.hidden = true; }
+function togglePalette() { paletteOpen() ? closePalette() : openPalette(); }
+function moveSel(d) { palSel = Math.max(0, Math.min(palItems.length - 1, palSel + d)); renderPalette(); }
+function runSel() { const it = palItems[palSel]; if (it) it.run(); }
+
+const palInput = document.getElementById("palette-input");
+if (palInput) palInput.addEventListener("input", () => { palItems = buildPaletteItems(palInput.value); palSel = 0; renderPalette(); });
+const palResults = document.getElementById("palette-results");
+if (palResults) {
+  palResults.addEventListener("mousemove", (e) => { const it = e.target.closest(".pal-item"); if (it && +it.dataset.i !== palSel) { palSel = +it.dataset.i; renderPalette(); } });
+  palResults.addEventListener("click", (e) => { const it = e.target.closest(".pal-item"); if (it) { palSel = +it.dataset.i; runSel(); } });
+}
+const palOverlay = paletteEl();
+if (palOverlay) palOverlay.addEventListener("mousedown", (e) => { if (e.target === palOverlay) closePalette(); });
+const cmdkBtn = document.getElementById("cmdk");
+if (cmdkBtn) { if (!IS_MAC) { const k = cmdkBtn.querySelector("kbd"); if (k) k.textContent = "Ctrl K"; } cmdkBtn.addEventListener("click", openPalette); }
+
+function isTyping(el) {
+  if (!el) return false;
+  const t = el.tagName;
+  return t === "INPUT" || t === "TEXTAREA" || t === "SELECT" || el.isContentEditable;
+}
+document.addEventListener("keydown", (e) => {
+  if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K")) { e.preventDefault(); togglePalette(); return; }
+  if (paletteOpen()) {
+    if (e.key === "Escape") { e.preventDefault(); closePalette(); }
+    else if (e.key === "ArrowDown") { e.preventDefault(); moveSel(1); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); moveSel(-1); }
+    else if (e.key === "Enter") { e.preventDefault(); runSel(); }
+    return;
+  }
+  if (isTyping(e.target)) { if (e.key === "Escape") e.target.blur(); return; }
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.key === "/") { e.preventDefault(); const f = document.getElementById("filter"); if (f) f.focus(); }
+  else if (e.key === "t" || e.key === "T") { toggleTheme(); }
+  else if (e.key === "?") { e.preventDefault(); openPalette(); }
+});
 
 async function load() {
   try {
