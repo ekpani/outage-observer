@@ -4,6 +4,7 @@ import { type Env } from "./telegram";
 import { onUpdate } from "./bot";
 import { handleIngest } from "./ingest";
 import { handleFeed } from "./feed";
+import { handleSeo } from "./seo";
 import { detectWebhookKind, sendWebhookConfirmation } from "./channels";
 import { CATALOG } from "./catalog";
 
@@ -58,6 +59,20 @@ export default {
     if (request.method === "GET" && (url.pathname === "/feed" || url.pathname === "/feed.xml" || url.pathname.startsWith("/feed/"))) {
       const feed = await handleFeed(env, url);
       if (feed) return feed;
+    }
+
+    // SEO / AEO surfaces: server-rendered provider pages, the directory,
+    // sitemap, and llms.txt. Edge-cached so crawlers don't hit KV/D1 each time.
+    if (request.method === "GET" && (url.pathname === "/status" || url.pathname.startsWith("/status/") || url.pathname === "/sitemap.xml" || url.pathname === "/llms.txt")) {
+      const cache = caches.default;
+      const cacheKey = new Request(url.toString());
+      const hit = await cache.match(cacheKey);
+      if (hit) return hit;
+      const res = await handleSeo(env, url);
+      if (res) {
+        if (res.ok) ctx.waitUntil(cache.put(cacheKey, res.clone()));
+        return res;
+      }
     }
 
     // Web Push: hand the browser the VAPID public key it needs to subscribe.

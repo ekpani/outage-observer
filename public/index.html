@@ -19,8 +19,38 @@
   <meta name="twitter:image" content="https://outage.observer/og.png" />
   <meta name="theme-color" content="#FBFBFA" media="(prefers-color-scheme: light)" />
   <meta name="theme-color" content="#070809" media="(prefers-color-scheme: dark)" />
+  <link rel="canonical" href="https://outage.observer/" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="alternate" type="application/atom+xml" title="Outage Observer status changes" href="/feed.xml" />
   <link rel="preload" href="/fonts/DepartureMono-Regular.woff2" as="font" type="font/woff2" crossorigin />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": "https://outage.observer/#org",
+        "name": "Outage Observer",
+        "url": "https://outage.observer/",
+        "logo": "https://outage.observer/og.png",
+        "description": "Live status of the infrastructure and AI providers in your stack, aggregated from their official status pages."
+      },
+      {
+        "@type": "WebSite",
+        "@id": "https://outage.observer/#site",
+        "name": "Outage Observer",
+        "url": "https://outage.observer/",
+        "publisher": { "@id": "https://outage.observer/#org" },
+        "description": "A fast, no-login status board for the infra and AI providers in your stack. One page, all your services, live.",
+        "potentialAction": {
+          "@type": "SearchAction",
+          "target": { "@type": "EntryPoint", "urlTemplate": "https://outage.observer/status?q={search_term_string}" },
+          "query-input": "required name=search_term_string"
+        }
+      }
+    ]
+  }
+  </script>
   <link rel="stylesheet" href="/tokens.css" />
   <link rel="stylesheet" href="/board.css" />
   <script>
@@ -72,7 +102,7 @@
       <div id="hook-msg" class="notify-msg" role="status"></div>
     </section>
     <footer class="page-foot mono">
-      outage.observer · polled every minute · <a href="https://t.me/outageobserverbot">@outageobserverbot</a> · <a id="rss-link" href="/feed.xml">RSS</a><br />
+      outage.observer · polled every minute · <a href="/status">all providers</a> · <a href="https://t.me/outageobserverbot">@outageobserverbot</a> · <a id="rss-link" href="/feed.xml">RSS</a><br />
       <a href="https://ekpani.com">an ekpani tool</a>
     </footer>
   </main>

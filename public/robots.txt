@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /ingest/
+Disallow: /webhook
+Disallow: /debug/
+
+Sitemap: https://outage.observer/sitemap.xml
