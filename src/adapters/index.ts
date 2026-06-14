@@ -5,6 +5,8 @@ import { fetchInstatus } from "./instatus";
 import { fetchSlack } from "./slack";
 import { fetchHeroku } from "./heroku";
 import { fetchGcp } from "./gcp";
+import { fetchAws } from "./aws";
+import { fetchAzure } from "./azure";
 
 export type { Level, Incident, ProviderStatus } from "./types";
 export { SEVERITY } from "./types";
@@ -22,5 +24,9 @@ export function fetchStatus(provider: Provider): Promise<ProviderStatus> {
       return fetchHeroku(provider.url);
     case "gcp":
       return fetchGcp(provider.url);
+    case "aws":
+      return fetchAws(provider.url);
+    case "azure":
+      return fetchAzure(provider.url);
   }
 }

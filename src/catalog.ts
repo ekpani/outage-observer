@@ -1,4 +1,4 @@
-export type Adapter = "statuspage" | "instatus" | "slack" | "heroku" | "gcp";
+export type Adapter = "statuspage" | "instatus" | "slack" | "heroku" | "gcp" | "aws" | "azure";
 
 export interface Provider {
   id: string;
@@ -15,22 +15,23 @@ export interface Provider {
 
 /**
  * Curated catalog, all entries probed live (scripts/probe-catalog*.mjs).
- * statuspage/instatus entries expose the standard feed; slack/heroku/gcp use
- * each vendor's own JSON API (for those, `url` is the full endpoint and `link`
- * is the human page).
+ * statuspage/instatus entries expose the standard feed; slack/heroku/gcp/aws/
+ * azure use each vendor's own JSON or RSS API (for those, `url` is the full
+ * endpoint and `link` is the human page).
  *
  * Lesson: a vendor's REAL Statuspage often lives at www.<brand>status.com, not
  * status.<brand> (Stripe = www.stripestatus.com, Notion = www.notion-status.com).
  *
- * Next feeds worth an adapter: AWS (UTF-16 JSON, health.aws.amazon.com), Azure
- * (RSS). Verified custom client-rendered SPAs with no feed: Fastly, Okta,
- * Docker, PagerDuty, Hugging Face, GitLab, PayPal.
+ * Verified custom client-rendered SPAs with no feed (would need a headless
+ * browser): Fastly, Okta, Docker, PagerDuty, Hugging Face, GitLab, PayPal.
  */
 export const CATALOG: Provider[] = [
   // Cloud & hosting
   { id: "cloudflare", name: "Cloudflare", category: "Cloud & hosting", adapter: "statuspage", url: "https://www.cloudflarestatus.com" },
   { id: "gcp", name: "Google Cloud", category: "Cloud & hosting", adapter: "gcp", url: "https://status.cloud.google.com/incidents.json", link: "https://status.cloud.google.com" },
   { id: "heroku", name: "Heroku", category: "Cloud & hosting", adapter: "heroku", url: "https://status.heroku.com/api/v4/current-status", link: "https://status.heroku.com" },
+  { id: "aws", name: "Amazon Web Services", category: "Cloud & hosting", adapter: "aws", url: "https://health.aws.amazon.com/public/currentevents", link: "https://health.aws.amazon.com/health/status" },
+  { id: "azure", name: "Microsoft Azure", category: "Cloud & hosting", adapter: "azure", url: "https://azure.status.microsoft/en-us/status/feed/", link: "https://status.azure.com" },
   { id: "vercel", name: "Vercel", category: "Cloud & hosting", adapter: "statuspage", url: "https://www.vercel-status.com" },
   { id: "netlify", name: "Netlify", category: "Cloud & hosting", adapter: "statuspage", url: "https://www.netlifystatus.com" },
   { id: "digitalocean", name: "DigitalOcean", category: "Cloud & hosting", adapter: "statuspage", url: "https://status.digitalocean.com" },
