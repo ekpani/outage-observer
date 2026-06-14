@@ -15,13 +15,16 @@ export interface Provider {
  * statuspage/instatus entries expose the standard feed; slack/heroku/gcp use
  * each vendor's own JSON API (for those, `url` is the full endpoint).
  *
- * Doable next (real feeds, just need an adapter): AWS (UTF-16 JSON at
+ * Note: a vendor's REAL Statuspage often lives at a different host than their
+ * marketing status page — Stripe = www.stripestatus.com, Notion =
+ * www.notion-status.com (both standard Statuspage; status.stripe.com is just a
+ * client-rendered skin). Always probe the alt domain before giving up.
+ *
+ * Doable next (real feeds, need an adapter): AWS (UTF-16 JSON at
  * health.aws.amazon.com/public/currentevents), Azure (RSS).
  *
- * NOT feasible without a headless browser — verified to be client-rendered
- * status SPAs with no public JSON feed: Stripe, Notion, Fastly, Okta, Docker,
- * PagerDuty, Hugging Face, GitLab, PayPal. (Payments stays empty until a
- * processor exposes a feed.)
+ * Verified genuinely custom client-rendered SPAs with no public feed: Fastly,
+ * Okta, Docker, PagerDuty, Hugging Face, GitLab, PayPal.
  */
 export const CATALOG: Provider[] = [
   // Cloud & hosting
@@ -49,6 +52,9 @@ export const CATALOG: Provider[] = [
   { id: "upstash", name: "Upstash", category: "Data & backend", adapter: "statuspage", url: "https://status.upstash.com" },
   { id: "cockroach", name: "CockroachDB", category: "Data & backend", adapter: "statuspage", url: "https://status.cockroachlabs.cloud" },
 
+  // Payments
+  { id: "stripe", name: "Stripe", category: "Payments", adapter: "statuspage", url: "https://www.stripestatus.com" },
+
   // Comms
   { id: "twilio", name: "Twilio", category: "Comms", adapter: "statuspage", url: "https://status.twilio.com" },
   { id: "sendgrid", name: "SendGrid", category: "Comms", adapter: "statuspage", url: "https://status.sendgrid.com" },
@@ -75,6 +81,7 @@ export const CATALOG: Provider[] = [
   { id: "asana", name: "Asana", category: "Collaboration", adapter: "statuspage", url: "https://status.asana.com" },
   { id: "airtable", name: "Airtable", category: "Collaboration", adapter: "statuspage", url: "https://status.airtable.com" },
   { id: "linear", name: "Linear", category: "Collaboration", adapter: "statuspage", url: "https://linearstatus.com" },
+  { id: "notion", name: "Notion", category: "Collaboration", adapter: "statuspage", url: "https://www.notion-status.com" },
 
   // CDN & edge
   { id: "bunny", name: "Bunny.net", category: "CDN & edge", adapter: "statuspage", url: "https://status.bunny.net" },
