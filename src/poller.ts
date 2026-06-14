@@ -1,4 +1,4 @@
-import { CATALOG, type Provider } from "./catalog";
+import { CATALOG, PRIORITY_IDS, type Provider } from "./catalog";
 import { fetchStatus, SEVERITY, type Level, type ProviderStatus } from "./adapters";
 import { getBoard, setBoard, getSubscribers, type Board, type BoardEntry } from "./store";
 import { sendMessage, type Env } from "./telegram";
@@ -25,21 +25,24 @@ function toEntry(provider: Provider, status: ProviderStatus): BoardEntry {
   return entry;
 }
 
-// Free tier allows 50 subrequests per invocation. Poll a time-based shard of
-// the catalog each minute so a tick stays well under that (with headroom for
-// KV ops + Telegram sends). Each provider is refreshed every NUM_SHARDS minutes.
-const SHARD_TARGET = 30;
+// Free tier allows 50 subrequests per invocation. Each tick polls the priority
+// providers (every minute) plus one rotating shard of the rest, keeping the
+// total well under 50 with headroom for KV ops + Telegram sends.
+const REST_SHARD_TARGET = 15;
 
-/** Poll one shard of the catalog, merge into the persisted board (kept whole),
- *  and alert subscribers on any transition. `nowMs` picks the shard. Returns
- *  the number of transitions detected. */
+/** Poll the priority set plus one shard of the remaining catalog, merge into
+ *  the persisted board (kept whole), and alert subscribers on any transition.
+ *  `nowMs` selects the shard. Returns the number of transitions detected. */
 export async function poll(env: Env, nowMs: number): Promise<number> {
-  const numShards = Math.max(1, Math.ceil(CATALOG.length / SHARD_TARGET));
+  const priority = CATALOG.filter((p) => PRIORITY_IDS.has(p.id));
+  const rest = CATALOG.filter((p) => !PRIORITY_IDS.has(p.id));
+  const numShards = Math.max(1, Math.ceil(rest.length / REST_SHARD_TARGET));
   const shardIndex = Math.floor(nowMs / 60000) % numShards;
+  const toPoll = [...priority, ...rest.filter((_, i) => i % numShards === shardIndex)];
 
   const fetched = new Map<string, ProviderStatus>();
   await Promise.all(
-    CATALOG.filter((_, i) => i % numShards === shardIndex).map(async (provider) => {
+    toPoll.map(async (provider) => {
       try {
         fetched.set(provider.id, await fetchStatus(provider));
       } catch {

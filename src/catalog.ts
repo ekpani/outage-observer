@@ -156,3 +156,11 @@ export const CATALOG: Provider[] = [
   { id: "mixpanel", name: "Mixpanel", category: "Analytics", adapter: "statuspage", url: "https://www.mixpanelstatus.com" },
   { id: "segment", name: "Segment", category: "Analytics", adapter: "statuspage", url: "https://status.segment.com" },
 ];
+
+/** The most-depended-on providers: polled every minute (~1-min freshness and
+ *  alert latency). Everything else rotates through ~6-minute shards. Tweak
+ *  freely — this is just "what devs panic about first". */
+export const PRIORITY_IDS = new Set<string>([
+  "aws", "gcp", "azure", "cloudflare", "vercel", "netlify", "github", "npm",
+  "openai", "anthropic", "stripe", "slack", "discord", "twilio", "supabase", "mongodb",
+]);
