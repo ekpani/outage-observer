@@ -1,8 +1,10 @@
 export interface Env {
   STATUS_KV: KVNamespace;
+  DB: D1Database;
   BOT_TOKEN: string;
   WEBHOOK_SECRET: string;
   DEBUG_KEY: string;
+  INGEST_SECRET: string;
 }
 
 export interface InlineButton {

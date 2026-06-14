@@ -31,9 +31,8 @@ function toEntry(provider: Provider, status: ProviderStatus): BoardEntry {
 // total well under 50 with headroom for KV ops + Telegram sends.
 const REST_SHARD_TARGET = 15;
 
-/** Poll the priority set plus one shard of the remaining catalog, merge into
- *  the persisted board (kept whole), and alert subscribers on any transition.
- *  `nowMs` selects the shard. Returns the number of transitions detected. */
+/** Poll the priority set plus one shard of the remaining catalog. `nowMs`
+ *  selects the shard. Returns the number of transitions detected. */
 export async function poll(env: Env, nowMs: number): Promise<number> {
   const priority = CATALOG.filter((p) => PRIORITY_IDS.has(p.id));
   const rest = CATALOG.filter((p) => !PRIORITY_IDS.has(p.id));
@@ -47,11 +46,27 @@ export async function poll(env: Env, nowMs: number): Promise<number> {
       try {
         fetched.set(provider.id, await fetchStatus(provider));
       } catch {
-        /* leave unfetched; the previous board entry is kept below */
+        /* leave unfetched; the previous board entry is kept */
       }
     }),
   );
 
+  return applyResults(env, fetched);
+}
+
+/**
+ * SHARED SEAM. Merge a batch of freshly-fetched provider statuses into the
+ * persisted board (keeping every other provider's last-known entry), write the
+ * board when it changes, and alert subscribers on any transition. Used by both
+ * the cron poll (a shard's worth) and the push-webhook ingest path (one
+ * provider). Returns the number of transitions.
+ *
+ * Keep this signature stable — the ingest path depends on it.
+ */
+export async function applyResults(
+  env: Env,
+  fetched: Map<string, ProviderStatus>,
+): Promise<number> {
   const prev = await getBoard(env);
   const prevById = new Map((prev?.providers ?? []).map((e) => [e.id, e] as const));
 
@@ -62,7 +77,7 @@ export async function poll(env: Env, nowMs: number): Promise<number> {
     const prevEntry = prevById.get(provider.id);
     const status = fetched.get(provider.id);
 
-    // Not polled this tick, or the fetch failed: keep the last known entry.
+    // Not in this batch, or a failed fetch: keep the last known entry.
     if (!status || status.level === "unknown") {
       entries.push(prevEntry ?? toEntry(provider, { level: "unknown", description: "", incidents: [] }));
       continue;
@@ -74,10 +89,8 @@ export async function poll(env: Env, nowMs: number): Promise<number> {
     }
   }
 
-  // Write the board only when its contents change (KV write-budget friendly).
   if (!prev || JSON.stringify(entries) !== JSON.stringify(prev.providers)) {
-    const board: Board = { updatedAt: new Date().toISOString(), providers: entries };
-    await setBoard(env, board);
+    await setBoard(env, { updatedAt: new Date().toISOString(), providers: entries });
   }
 
   if (transitions.length === 0) return 0;
@@ -87,8 +100,7 @@ export async function poll(env: Env, nowMs: number): Promise<number> {
   for (const u of users) watchByUser.set(u, new Set(await getWatch(env, u)));
 
   // Fan out only to users watching the changed provider. The send budget keeps
-  // the invocation under the free-tier 50-subrequest cap; this only bites during
-  // a transition with many subscribers, at which point a Queue is the real fix.
+  // the invocation under the free-tier 50-subrequest cap.
   const MAX_SENDS = 40;
   let sent = 0;
   for (const t of transitions) {
