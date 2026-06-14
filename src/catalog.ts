@@ -1,24 +1,27 @@
-export type Adapter = "statuspage" | "instatus";
+export type Adapter = "statuspage" | "instatus" | "slack" | "heroku" | "gcp";
 
 export interface Provider {
   id: string;
   name: string;
   category: string;
   adapter: Adapter;
-  /** Base status-page URL, no trailing slash. */
+  /** statuspage/instatus: base status-page URL (no trailing slash).
+   *  slack/heroku/gcp: the full feed endpoint. */
   url: string;
 }
 
 /**
- * Curated catalog. Every entry was probed live (scripts/probe-catalog.mjs) and
- * confirmed to expose a standard Statuspage (/api/v2/summary.json) or Instatus
- * (/summary.json) feed, so each one actually resolves.
+ * Curated catalog, all entries probed live (scripts/probe-catalog*.mjs).
+ * statuspage/instatus entries expose the standard feed; slack/heroku/gcp use
+ * each vendor's own JSON API (for those, `url` is the full endpoint).
  *
- * Pending a custom adapter (these moved to bespoke status pages with no standard
- * JSON feed): Stripe, PayPal, Paddle, GitLab, Heroku, Docker, Slack, Auth0, Okta,
- * Notion, Fastly, PagerDuty, Hugging Face, Mistral, OpenRouter, Together, Resend,
- * Neon, Railway, JetBrains, jsDelivr. Adding per-vendor adapters brings them in.
- * (This is why Payments is currently empty: Stripe/PayPal/Paddle are all custom.)
+ * Doable next (real feeds, just need an adapter): AWS (UTF-16 JSON at
+ * health.aws.amazon.com/public/currentevents), Azure (RSS).
+ *
+ * NOT feasible without a headless browser — verified to be client-rendered
+ * status SPAs with no public JSON feed: Stripe, Notion, Fastly, Okta, Docker,
+ * PagerDuty, Hugging Face, GitLab, PayPal. (Payments stays empty until a
+ * processor exposes a feed.)
  */
 export const CATALOG: Provider[] = [
   // Cloud & hosting
@@ -29,6 +32,8 @@ export const CATALOG: Provider[] = [
   { id: "fly", name: "Fly.io", category: "Cloud & hosting", adapter: "statuspage", url: "https://status.flyio.net" },
   { id: "render", name: "Render", category: "Cloud & hosting", adapter: "statuspage", url: "https://status.render.com" },
   { id: "linode", name: "Linode", category: "Cloud & hosting", adapter: "statuspage", url: "https://status.linode.com" },
+  { id: "gcp", name: "Google Cloud", category: "Cloud & hosting", adapter: "gcp", url: "https://status.cloud.google.com/incidents.json" },
+  { id: "heroku", name: "Heroku", category: "Cloud & hosting", adapter: "heroku", url: "https://status.heroku.com/api/v4/current-status" },
 
   // Dev & CI
   { id: "github", name: "GitHub", category: "Dev & CI", adapter: "statuspage", url: "https://www.githubstatus.com" },
@@ -49,6 +54,7 @@ export const CATALOG: Provider[] = [
   { id: "sendgrid", name: "SendGrid", category: "Comms", adapter: "statuspage", url: "https://status.sendgrid.com" },
   { id: "discord", name: "Discord", category: "Comms", adapter: "statuspage", url: "https://discordstatus.com" },
   { id: "zoom", name: "Zoom", category: "Comms", adapter: "statuspage", url: "https://status.zoom.us" },
+  { id: "slack", name: "Slack", category: "Comms", adapter: "slack", url: "https://slack-status.com/api/v2.0.0/current" },
 
   // Auth & identity
   { id: "clerk", name: "Clerk", category: "Auth & identity", adapter: "statuspage", url: "https://status.clerk.com" },

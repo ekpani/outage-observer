@@ -2,6 +2,9 @@ import type { Provider } from "../catalog";
 import type { ProviderStatus } from "./types";
 import { fetchStatuspage } from "./statuspage";
 import { fetchInstatus } from "./instatus";
+import { fetchSlack } from "./slack";
+import { fetchHeroku } from "./heroku";
+import { fetchGcp } from "./gcp";
 
 export type { Level, Incident, ProviderStatus } from "./types";
 export { SEVERITY } from "./types";
@@ -13,5 +16,11 @@ export function fetchStatus(provider: Provider): Promise<ProviderStatus> {
       return fetchStatuspage(provider.url);
     case "instatus":
       return fetchInstatus(provider.url);
+    case "slack":
+      return fetchSlack(provider.url);
+    case "heroku":
+      return fetchHeroku(provider.url);
+    case "gcp":
+      return fetchGcp(provider.url);
   }
 }
