@@ -10,11 +10,11 @@
   "triggers": {
     "crons": ["* * * * *"]
   },
-  // Run `npx wrangler kv namespace create STATUS_KV` and paste the id here.
+  // KV namespace (created in the Cloudflare dashboard).
   "kv_namespaces": [
     {
       "binding": "STATUS_KV",
-      "id": "REPLACE_WITH_KV_ID"
+      "id": "581f24a5d7314dd8b7aec8e1aa21fc14"
     }
   ]
 }
