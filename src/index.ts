@@ -1,7 +1,7 @@
 import { CATALOG } from "./catalog";
 import { fetchStatus } from "./adapters";
 import { pollAll, formatAlert } from "./poller";
-import { addSubscriber, removeSubscriber, getSubscribers } from "./store";
+import { addSubscriber, removeSubscriber, getSubscribers, getBoard } from "./store";
 import { sendMessage, type Env } from "./telegram";
 import { EMOJI } from "./labels";
 
@@ -14,11 +14,35 @@ export default {
     await pollAll(env);
   },
 
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
     if (url.pathname === "/") {
       return new Response("outage-observer: ok");
+    }
+
+    // Public board snapshot. Edge-cached so a traffic spike (an outage is
+    // exactly when everyone shows up) doesn't hammer KV. The cron refreshes
+    // the underlying board; clients see at most ~30s of staleness.
+    if (url.pathname === "/api/status" && request.method === "GET") {
+      const cache = caches.default;
+      const cacheKey = new Request(new URL("/api/status", url.origin).toString());
+      const hit = await cache.match(cacheKey);
+      if (hit) return hit;
+
+      const board = await getBoard(env);
+      const res = new Response(
+        JSON.stringify(board ?? { updatedAt: null, providers: [] }),
+        {
+          headers: {
+            "content-type": "application/json; charset=utf-8",
+            "access-control-allow-origin": "*",
+            "cache-control": "public, max-age=15, s-maxage=30",
+          },
+        },
+      );
+      ctx.waitUntil(cache.put(cacheKey, res.clone()));
+      return res;
     }
 
     // Telegram webhook

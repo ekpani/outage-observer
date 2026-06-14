@@ -1,6 +1,6 @@
-import { CATALOG } from "./catalog";
+import { CATALOG, type Provider } from "./catalog";
 import { fetchStatus, SEVERITY, type Level, type ProviderStatus } from "./adapters";
-import { getAllLevels, setAllLevels, getSubscribers } from "./store";
+import { getBoard, setBoard, getSubscribers, type Board, type BoardEntry } from "./store";
 import { sendMessage, type Env } from "./telegram";
 import { EMOJI, LABEL } from "./labels";
 
@@ -11,37 +11,61 @@ interface Transition {
   status: ProviderStatus;
 }
 
-/** Poll every provider, alert subscribers on any state change. Returns the
- *  number of transitions detected this run. */
+function toEntry(provider: Provider, status: ProviderStatus): BoardEntry {
+  const entry: BoardEntry = {
+    id: provider.id,
+    name: provider.name,
+    category: provider.category,
+    level: status.level,
+    description: status.description,
+  };
+  const top = status.incidents[0];
+  if (top) entry.incident = { name: top.name, url: top.url };
+  return entry;
+}
+
+/** Poll every provider, persist the board (only when it changes), and alert
+ *  subscribers on any state transition. Returns the number of transitions. */
 export async function pollAll(env: Env): Promise<number> {
-  const results = await Promise.allSettled(
-    CATALOG.map(async (provider) => ({
-      provider,
-      status: await fetchStatus(provider),
-    })),
+  const results = await Promise.all(
+    CATALOG.map(async (provider) => {
+      try {
+        return { provider, status: await fetchStatus(provider) };
+      } catch {
+        const status: ProviderStatus = { level: "unknown", description: "", incidents: [] };
+        return { provider, status };
+      }
+    }),
   );
 
-  // One KV read for all providers; write back only if something changed.
-  const levels = await getAllLevels(env);
+  const prev = await getBoard(env);
+  const prevById = new Map((prev?.providers ?? []).map((e) => [e.id, e] as const));
+
+  const entries: BoardEntry[] = [];
   const transitions: Transition[] = [];
-  let changed = false;
 
-  for (const result of results) {
-    if (result.status !== "fulfilled") continue;
-    const { provider, status } = result.value;
-    // Never alert on (or persist) a failed fetch; keep the last good level.
-    if (status.level === "unknown") continue;
+  for (const { provider, status } of results) {
+    const prevEntry = prevById.get(provider.id);
 
-    const prev = levels[provider.id];
-    if (prev === status.level) continue;
-    if (prev) {
-      transitions.push({ name: provider.name, from: prev, to: status.level, status });
+    // On a failed fetch, keep the last known entry rather than flap to unknown.
+    if (status.level === "unknown") {
+      entries.push(prevEntry ?? toEntry(provider, status));
+      continue;
     }
-    levels[provider.id] = status.level;
-    changed = true;
+
+    entries.push(toEntry(provider, status));
+
+    if (prevEntry && prevEntry.level !== "unknown" && prevEntry.level !== status.level) {
+      transitions.push({ name: provider.name, from: prevEntry.level, to: status.level, status });
+    }
   }
 
-  if (changed) await setAllLevels(env, levels);
+  // Write the board only when its contents change (KV write-budget friendly).
+  if (!prev || JSON.stringify(entries) !== JSON.stringify(prev.providers)) {
+    const board: Board = { updatedAt: new Date().toISOString(), providers: entries };
+    await setBoard(env, board);
+  }
+
   if (transitions.length === 0) return 0;
 
   const subscribers = await getSubscribers(env);
