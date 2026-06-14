@@ -2,6 +2,7 @@ import { poll, formatAlert } from "./poller";
 import { getBoard, getUsers } from "./store";
 import { sendMessage, type Env } from "./telegram";
 import { onUpdate } from "./bot";
+import { handleIngest } from "./ingest";
 
 export default {
   async scheduled(
@@ -52,6 +53,21 @@ export default {
       }
       // Always 200 so Telegram does not retry-storm on an internal error.
       return new Response("ok");
+    }
+
+    // Push ingest: a provider's status-page webhook pings us; we re-fetch + apply.
+    if (url.pathname.startsWith("/ingest/") && request.method === "POST") {
+      const secret = request.headers.get("x-ingest-secret") ?? url.searchParams.get("secret") ?? "";
+      if (!(await safeEqual(secret, env.INGEST_SECRET))) {
+        return new Response("forbidden", { status: 403 });
+      }
+      const providerId = url.pathname.slice("/ingest/".length);
+      try {
+        return await handleIngest(env, providerId);
+      } catch (err) {
+        console.error("ingest failed", { error: String(err) });
+        return new Response("ok"); // ack so the sender does not retry-storm
+      }
     }
 
     // Debug routes (dev only; remove or move behind a header before launch).

@@ -14,11 +14,21 @@
   "triggers": {
     "crons": ["* * * * *"]
   },
-  // KV namespace (created in the Cloudflare dashboard).
+  // KV namespace (created in the Cloudflare dashboard). Holds the board blob.
   "kv_namespaces": [
     {
       "binding": "STATUS_KV",
       "id": "581f24a5d7314dd8b7aec8e1aa21fc14"
+    }
+  ],
+  // D1 database for users, watch lists, and the alert outbox. Create it with
+  // `npx wrangler d1 create outage-observer`, paste the returned id below, then
+  // apply schema.sql with `npx wrangler d1 execute outage-observer --remote --file=schema.sql`.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "outage-observer",
+      "database_id": "PLACEHOLDER_RUN_D1_CREATE"
     }
   ]
 }

@@ -1,7 +1,7 @@
 import { CATALOG, PRIORITY_IDS, type Provider } from "./catalog";
 import { fetchStatus, SEVERITY, type Level, type ProviderStatus } from "./adapters";
-import { getBoard, setBoard, getUsers, getWatch, type Board, type BoardEntry } from "./store";
-import { sendMessage, type Env } from "./telegram";
+import { getBoard, setBoard, enqueueNotification, drainOutbox, type Board, type BoardEntry } from "./store";
+import { type Env } from "./telegram";
 import { EMOJI, LABEL } from "./labels";
 
 interface Transition {
@@ -93,28 +93,27 @@ export async function applyResults(
     await setBoard(env, { updatedAt: new Date().toISOString(), providers: entries });
   }
 
-  if (transitions.length === 0) return 0;
-
-  const users = await getUsers(env);
-  const watchByUser = new Map<number, Set<string>>();
-  for (const u of users) watchByUser.set(u, new Set(await getWatch(env, u)));
-
-  // Fan out only to users watching the changed provider. The send budget keeps
-  // the invocation under the free-tier 50-subrequest cap.
-  const MAX_SENDS = 40;
-  let sent = 0;
+  // Fan out via the durable outbox. For each transition, look up exactly the
+  // subscribers watching that provider (one indexed D1 query) and enqueue a
+  // message per subscriber. Enqueuing is cheap (DB writes, not subrequests), so
+  // even a wide outage can't blow the budget here.
   for (const t of transitions) {
+    const { results } = await env.DB
+      .prepare("SELECT chat_id FROM subscriptions WHERE provider_id = ?")
+      .bind(t.id)
+      .all<{ chat_id: number }>();
     const text = formatAlert(t.name, t.from, t.to, t.status);
-    for (const u of users) {
-      if (!watchByUser.get(u)?.has(t.id)) continue;
-      if (sent >= MAX_SENDS) {
-        console.warn("fan-out capped at MAX_SENDS", { sent });
-        return transitions.length;
-      }
-      await sendMessage(env, u, text);
-      sent++;
+    for (const row of results) {
+      await enqueueNotification(env, row.chat_id, text);
     }
   }
+
+  // Drain a bounded batch of queued messages every invocation — including ticks
+  // with no transitions — so any backlog flushes over subsequent cron ticks
+  // (cron runs every minute). The cap keeps sends within the shared
+  // 50-subrequest budget alongside the ~31 status fetches in this poll.
+  await drainOutbox(env, 10);
+
   return transitions.length;
 }
 
