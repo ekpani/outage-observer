@@ -1,10 +1,11 @@
 import { CATALOG, PRIORITY_IDS, type Provider } from "./catalog";
 import { fetchStatus, SEVERITY, type Level, type ProviderStatus } from "./adapters";
-import { getBoard, setBoard, getSubscribers, type Board, type BoardEntry } from "./store";
+import { getBoard, setBoard, getUsers, getWatch, type Board, type BoardEntry } from "./store";
 import { sendMessage, type Env } from "./telegram";
 import { EMOJI, LABEL } from "./labels";
 
 interface Transition {
+  id: string;
   name: string;
   from: Level;
   to: Level;
@@ -69,7 +70,7 @@ export async function poll(env: Env, nowMs: number): Promise<number> {
 
     entries.push(toEntry(provider, status));
     if (prevEntry && prevEntry.level !== "unknown" && prevEntry.level !== status.level) {
-      transitions.push({ name: provider.name, from: prevEntry.level, to: status.level, status });
+      transitions.push({ id: provider.id, name: provider.name, from: prevEntry.level, to: status.level, status });
     }
   }
 
@@ -81,11 +82,25 @@ export async function poll(env: Env, nowMs: number): Promise<number> {
 
   if (transitions.length === 0) return 0;
 
-  const subscribers = await getSubscribers(env);
+  const users = await getUsers(env);
+  const watchByUser = new Map<number, Set<string>>();
+  for (const u of users) watchByUser.set(u, new Set(await getWatch(env, u)));
+
+  // Fan out only to users watching the changed provider. The send budget keeps
+  // the invocation under the free-tier 50-subrequest cap; this only bites during
+  // a transition with many subscribers, at which point a Queue is the real fix.
+  const MAX_SENDS = 40;
+  let sent = 0;
   for (const t of transitions) {
     const text = formatAlert(t.name, t.from, t.to, t.status);
-    for (const chatId of subscribers) {
-      await sendMessage(env, chatId, text);
+    for (const u of users) {
+      if (!watchByUser.get(u)?.has(t.id)) continue;
+      if (sent >= MAX_SENDS) {
+        console.warn("fan-out capped at MAX_SENDS", { sent });
+        return transitions.length;
+      }
+      await sendMessage(env, u, text);
+      sent++;
     }
   }
   return transitions.length;

@@ -164,3 +164,10 @@ export const PRIORITY_IDS = new Set<string>([
   "aws", "gcp", "azure", "cloudflare", "vercel", "netlify", "github", "npm",
   "openai", "anthropic", "stripe", "slack", "discord", "twilio", "supabase", "mongodb",
 ]);
+
+/** Display order for the board and the bot's onboarding picker. */
+export const CATEGORY_ORDER: string[] = [
+  "Cloud & hosting", "Dev & CI", "Data & backend", "Payments", "Comms",
+  "Auth & identity", "AI & model providers", "Collaboration", "CDN & edge",
+  "Monitoring", "Commerce & CMS", "Analytics",
+];
