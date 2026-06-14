@@ -3,6 +3,7 @@ import { getBoard, getCheckedAt } from "./store";
 import { type Env } from "./telegram";
 import { onUpdate } from "./bot";
 import { handleIngest } from "./ingest";
+import { handleFeed } from "./feed";
 
 export default {
   async scheduled(
@@ -42,6 +43,12 @@ export default {
       );
       ctx.waitUntil(cache.put(cacheKey, res.clone()));
       return res;
+    }
+
+    // Atom feed of recent status changes (pull, no subscription needed).
+    if (request.method === "GET" && (url.pathname === "/feed" || url.pathname === "/feed.xml" || url.pathname.startsWith("/feed/"))) {
+      const feed = await handleFeed(env, url);
+      if (feed) return feed;
     }
 
     // Telegram webhook

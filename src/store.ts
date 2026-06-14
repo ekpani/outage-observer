@@ -167,6 +167,35 @@ export async function recordHistory(
     .run();
 }
 
+export interface HistoryEvent {
+  id: number;
+  provider_id: string;
+  level: Level;
+  at: number;
+}
+
+/** Recent transitions, newest first. Optionally restricted to a set of provider
+ *  ids (for per-provider / "my stack" feeds). Powers the Atom feed. */
+export async function getHistory(
+  env: Env,
+  ids: string[] | null,
+  limit = 50,
+): Promise<HistoryEvent[]> {
+  if (ids && ids.length) {
+    const placeholders = ids.map(() => "?").join(",");
+    const { results } = await env.DB
+      .prepare(`SELECT id, provider_id, level, at FROM history WHERE provider_id IN (${placeholders}) ORDER BY at DESC LIMIT ?`)
+      .bind(...ids, limit)
+      .all<HistoryEvent>();
+    return results;
+  }
+  const { results } = await env.DB
+    .prepare("SELECT id, provider_id, level, at FROM history ORDER BY at DESC LIMIT ?")
+    .bind(limit)
+    .all<HistoryEvent>();
+  return results;
+}
+
 // ---------- Meta (D1 key/value) ----------
 //
 // "Last checked" updates every poll, which would blow KV's 1,000 writes/day, so

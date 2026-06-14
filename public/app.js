@@ -230,6 +230,8 @@ function render() {
   if (!providers.length) { body.innerHTML = noData(); return; }
 
   const stack = getStack();
+  const rss = document.getElementById("rss-link");
+  if (rss) rss.href = stack.size ? "/feed.xml?ids=" + [...stack].join(",") : "/feed.xml";
   if (VIEW === null) VIEW = stack.size ? "board" : "browse";
   if (stack.size === 0) VIEW = "browse";   // no stack -> always the picker
 
