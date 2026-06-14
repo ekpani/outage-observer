@@ -25,16 +25,25 @@ function toEntry(provider: Provider, status: ProviderStatus): BoardEntry {
   return entry;
 }
 
-/** Poll every provider, persist the board (only when it changes), and alert
- *  subscribers on any state transition. Returns the number of transitions. */
-export async function pollAll(env: Env): Promise<number> {
-  const results = await Promise.all(
-    CATALOG.map(async (provider) => {
+// Free tier allows 50 subrequests per invocation. Poll a time-based shard of
+// the catalog each minute so a tick stays well under that (with headroom for
+// KV ops + Telegram sends). Each provider is refreshed every NUM_SHARDS minutes.
+const SHARD_TARGET = 30;
+
+/** Poll one shard of the catalog, merge into the persisted board (kept whole),
+ *  and alert subscribers on any transition. `nowMs` picks the shard. Returns
+ *  the number of transitions detected. */
+export async function poll(env: Env, nowMs: number): Promise<number> {
+  const numShards = Math.max(1, Math.ceil(CATALOG.length / SHARD_TARGET));
+  const shardIndex = Math.floor(nowMs / 60000) % numShards;
+
+  const fetched = new Map<string, ProviderStatus>();
+  await Promise.all(
+    CATALOG.filter((_, i) => i % numShards === shardIndex).map(async (provider) => {
       try {
-        return { provider, status: await fetchStatus(provider) };
+        fetched.set(provider.id, await fetchStatus(provider));
       } catch {
-        const status: ProviderStatus = { level: "unknown", description: "", incidents: [] };
-        return { provider, status };
+        /* leave unfetched; the previous board entry is kept below */
       }
     }),
   );
@@ -45,17 +54,17 @@ export async function pollAll(env: Env): Promise<number> {
   const entries: BoardEntry[] = [];
   const transitions: Transition[] = [];
 
-  for (const { provider, status } of results) {
+  for (const provider of CATALOG) {
     const prevEntry = prevById.get(provider.id);
+    const status = fetched.get(provider.id);
 
-    // On a failed fetch, keep the last known entry rather than flap to unknown.
-    if (status.level === "unknown") {
-      entries.push(prevEntry ?? toEntry(provider, status));
+    // Not polled this tick, or the fetch failed: keep the last known entry.
+    if (!status || status.level === "unknown") {
+      entries.push(prevEntry ?? toEntry(provider, { level: "unknown", description: "", incidents: [] }));
       continue;
     }
 
     entries.push(toEntry(provider, status));
-
     if (prevEntry && prevEntry.level !== "unknown" && prevEntry.level !== status.level) {
       transitions.push({ name: provider.name, from: prevEntry.level, to: status.level, status });
     }

@@ -1,17 +1,17 @@
 import { CATALOG } from "./catalog";
 import { fetchStatus } from "./adapters";
-import { pollAll, formatAlert } from "./poller";
+import { poll, formatAlert } from "./poller";
 import { addSubscriber, removeSubscriber, getSubscribers, getBoard } from "./store";
 import { sendMessage, type Env } from "./telegram";
 import { EMOJI } from "./labels";
 
 export default {
   async scheduled(
-    _controller: ScheduledController,
+    controller: ScheduledController,
     env: Env,
     _ctx: ExecutionContext,
   ): Promise<void> {
-    await pollAll(env);
+    await poll(env, controller.scheduledTime);
   },
 
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -59,8 +59,8 @@ export default {
 
     // Debug routes (dev only; remove or move behind a header before launch).
     if (url.pathname === "/debug/poll" && (await safeEqual(url.searchParams.get("key") ?? "", env.DEBUG_KEY))) {
-      const n = await pollAll(env);
-      return new Response(`polled, ${n} transition(s)`);
+      const n = await poll(env, Date.now());
+      return new Response(`polled one shard, ${n} transition(s)`);
     }
 
     // Debug: push a sample alert so you can confirm delivery + formatting
