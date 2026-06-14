@@ -59,7 +59,12 @@
     </div>
     <section class="notify" id="notify" hidden>
       <div class="notify-title">Get alerts when your stack changes</div>
-      <div class="notify-sub">Sent to the channel you choose, for the services in My Stack.</div>
+      <div class="notify-sub">For the services in My Stack. Pick a channel, or use the <a id="rss-link2" href="/feed.xml">RSS feed</a>.</div>
+      <div class="notify-row push-row" id="push-row" hidden>
+        <button id="push-toggle" class="btn">🔔 Enable browser alerts</button>
+        <span id="push-state" class="notify-hint mono"></span>
+      </div>
+      <div class="notify-label mono">Slack or Discord</div>
       <div class="notify-row">
         <input id="hook-url" class="hook-input" type="url" inputmode="url" placeholder="Paste a Slack or Discord webhook URL" autocomplete="off" spellcheck="false" />
         <button id="hook-connect" class="btn btn-primary">Connect</button>

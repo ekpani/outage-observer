@@ -50,6 +50,8 @@ const SLUGS = {
 
 const STACK_KEY = "oo-stack";
 const THEME_KEY = "oo-theme";
+const PUSH_ON_KEY = "oo-push-on";
+const PUSH_TOKEN_KEY = "oo-push-token";
 
 let BOARD = null;
 let VIEW = null;   // 'board' | 'browse'; null = decide from stack on first render
@@ -230,8 +232,11 @@ function render() {
   if (!providers.length) { body.innerHTML = noData(); return; }
 
   const stack = getStack();
+  const rssHref = stack.size ? "/feed.xml?ids=" + [...stack].join(",") : "/feed.xml";
   const rss = document.getElementById("rss-link");
-  if (rss) rss.href = stack.size ? "/feed.xml?ids=" + [...stack].join(",") : "/feed.xml";
+  if (rss) rss.href = rssHref;
+  const rss2 = document.getElementById("rss-link2");
+  if (rss2) rss2.href = rssHref;
   const notify = document.getElementById("notify");
   if (notify) notify.hidden = stack.size === 0;   // connect alerts once you have a stack
   if (VIEW === null) VIEW = stack.size ? "board" : "browse";
@@ -276,6 +281,7 @@ document.addEventListener("click", (e) => {
     stack.add(addBtn.dataset.add);
     saveStack(stack);
     render();           // stay in the picker so you can add several
+    syncPushIfEnabled();
     return;
   }
   const pin = e.target.closest(".pin");
@@ -285,6 +291,7 @@ document.addEventListener("click", (e) => {
     if (stack.has(id)) stack.delete(id); else stack.add(id);
     saveStack(stack);
     render();
+    syncPushIfEnabled();
     return;
   }
   if (e.target.closest("#theme")) toggleTheme();
@@ -323,6 +330,91 @@ async function connectWebhook() {
 }
 const hookBtn = document.getElementById("hook-connect");
 if (hookBtn) hookBtn.addEventListener("click", connectWebhook);
+
+// ---- Web Push ----
+function pushSupported() {
+  return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+}
+function urlB64ToU8(base64) {
+  const padding = "=".repeat((4 - (base64.length % 4)) % 4);
+  const b64 = (base64 + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(b64);
+  const out = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+  return out;
+}
+function refreshPushUI() {
+  const row = document.getElementById("push-row");
+  const btn = document.getElementById("push-toggle");
+  const state = document.getElementById("push-state");
+  if (!row || !btn) return;
+  if (!pushSupported()) { row.hidden = true; return; }
+  row.hidden = false;
+  const on = localStorage.getItem(PUSH_ON_KEY) === "1";
+  btn.textContent = on ? "🔔 Browser alerts on" : "🔔 Enable browser alerts";
+  btn.classList.toggle("on", on);
+  if (state) state.textContent = on ? "tap to turn off" : "";
+}
+async function enablePush() {
+  const state = document.getElementById("push-state");
+  const set = (t) => { if (state) state.textContent = t; };
+  const providers = [...getStack()];
+  if (!providers.length) return set("add services to My Stack first");
+  try {
+    const perm = await Notification.requestPermission();
+    if (perm !== "granted") return set("notifications are blocked");
+    const reg = await navigator.serviceWorker.register("/sw.js");
+    await navigator.serviceWorker.ready;
+    const { key } = await (await fetch("/api/push/key")).json();
+    if (!key) return set("push not available right now");
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64ToU8(key) });
+    const res = await fetch("/api/push/subscribe", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ subscription: sub.toJSON(), providers }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.ok) {
+      localStorage.setItem(PUSH_TOKEN_KEY, data.token);
+      localStorage.setItem(PUSH_ON_KEY, "1");
+      refreshPushUI();
+    } else { set(data.error || "could not enable"); }
+  } catch { set("could not enable browser alerts"); }
+}
+async function disablePush() {
+  try {
+    const reg = await navigator.serviceWorker.getRegistration();
+    const sub = reg && (await reg.pushManager.getSubscription());
+    if (sub) await sub.unsubscribe();
+  } catch {}
+  const token = localStorage.getItem(PUSH_TOKEN_KEY);
+  if (token) {
+    try { await fetch("/api/push/unsubscribe", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token }) }); } catch {}
+  }
+  localStorage.removeItem(PUSH_ON_KEY);
+  localStorage.removeItem(PUSH_TOKEN_KEY);
+  refreshPushUI();
+}
+// Keep the server's provider set in sync with My Stack when push is on.
+async function syncPushIfEnabled() {
+  if (localStorage.getItem(PUSH_ON_KEY) !== "1" || !pushSupported()) return;
+  try {
+    const reg = await navigator.serviceWorker.getRegistration();
+    const sub = reg && (await reg.pushManager.getSubscription());
+    if (!sub) return;
+    const providers = [...getStack()];
+    if (!providers.length) return disablePush();
+    await fetch("/api/push/subscribe", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ subscription: sub.toJSON(), providers }),
+    });
+  } catch {}
+}
+const pushBtn = document.getElementById("push-toggle");
+if (pushBtn) pushBtn.addEventListener("click", () => {
+  if (localStorage.getItem(PUSH_ON_KEY) === "1") disablePush(); else enablePush();
+});
+refreshPushUI();
 
 async function load() {
   try {

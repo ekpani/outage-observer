@@ -5,6 +5,12 @@ export interface Env {
   WEBHOOK_SECRET: string;
   DEBUG_KEY: string;
   INGEST_SECRET: string;
+  // Web Push (VAPID). Set via `wrangler secret put`. VAPID_PUBLIC is the
+  // base64url raw public key (also handed to browsers); VAPID_JWK is the private
+  // key JWK (JSON) for signing; VAPID_SUBJECT is a mailto: contact.
+  VAPID_PUBLIC: string;
+  VAPID_JWK: string;
+  VAPID_SUBJECT: string;
 }
 
 export interface InlineButton {

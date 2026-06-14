@@ -60,6 +60,38 @@ export default {
       if (feed) return feed;
     }
 
+    // Web Push: hand the browser the VAPID public key it needs to subscribe.
+    if (url.pathname === "/api/push/key" && request.method === "GET") {
+      return json({ key: env.VAPID_PUBLIC ?? null });
+    }
+
+    // Register / refresh a browser push subscription against a set of providers.
+    if (url.pathname === "/api/push/subscribe" && request.method === "POST") {
+      let body: { subscription?: { endpoint?: string; keys?: { p256dh?: string; auth?: string } }; providers?: unknown };
+      try { body = await request.json(); } catch { return json({ error: "Bad JSON." }, 400); }
+      const sub = body?.subscription;
+      const endpoint = String(sub?.endpoint ?? "");
+      const p256dh = sub?.keys?.p256dh;
+      const auth = sub?.keys?.auth;
+      if (!/^https:\/\//.test(endpoint) || !p256dh || !auth) {
+        return json({ error: "Invalid push subscription." }, 400);
+      }
+      const valid = new Set(CATALOG.map((p) => p.id));
+      const providers = Array.isArray(body?.providers) ? (body.providers as unknown[]).map(String).filter((x) => valid.has(x)) : [];
+      if (!providers.length) return json({ error: "Add at least one service to My Stack first." }, 400);
+
+      const { id, token } = await upsertTarget(env, "webpush", endpoint, JSON.stringify({ p256dh, auth }));
+      await setTargetSubs(env, id, providers);
+      return json({ ok: true, token, count: providers.length });
+    }
+
+    if (url.pathname === "/api/push/unsubscribe" && request.method === "POST") {
+      let body: { token?: string };
+      try { body = await request.json(); } catch { return json({ error: "Bad JSON." }, 400); }
+      const ok = await deleteTargetByToken(env, String(body?.token ?? ""));
+      return json({ ok });
+    }
+
     // Connect a Slack/Discord incoming webhook to a set of providers (the
     // caller's "My Stack"). POSTed from the board, same-origin (no CORS needed).
     if (url.pathname === "/api/webhook/subscribe" && request.method === "POST") {

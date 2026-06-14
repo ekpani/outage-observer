@@ -266,7 +266,10 @@ body[data-view="browse"] .row.added .row-main { box-shadow: inset 2px 0 0 var(--
 }
 .notify-title { font-weight: var(--oo-weight-semibold); font-size: 15px; }
 .notify-sub { font-size: 12.5px; color: var(--oo-text-muted); margin-top: 4px; }
-.notify-row { display: flex; gap: 10px; margin-top: 14px; }
+.notify-row { display: flex; gap: 10px; margin-top: 14px; align-items: center; }
+.notify-label { font-size: 11px; color: var(--oo-text-muted); text-transform: uppercase; letter-spacing: .12em; margin-top: 18px; }
+.notify-hint { font-size: 11.5px; color: var(--oo-text-muted); }
+.push-row .btn.on { border-color: var(--oo-accent); color: var(--oo-accent); background: color-mix(in srgb, var(--oo-accent) 12%, transparent); }
 .hook-input {
   flex: 1; min-width: 0; font-family: var(--oo-font-mono); font-size: 13px;
   background: var(--oo-bg-sunken); color: var(--oo-text-primary);
