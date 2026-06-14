@@ -362,9 +362,22 @@ async function enablePush() {
   const set = (t) => { if (state) state.textContent = t; };
   const providers = [...getStack()];
   if (!providers.length) return set("add services to My Stack first");
+
+  // iOS/iPadOS only allow web push from a Home-Screen web app, not a Safari tab.
+  const standalone = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  const isApple = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
+  if (isApple && !standalone) {
+    return set("on iPhone/iPad: Share → Add to Home Screen, then open it from there and tap the bell (Safari tabs can't do push)");
+  }
+
   try {
+    // Already denied: the browser won't re-prompt — it must be reset in site settings.
+    if (typeof Notification !== "undefined" && Notification.permission === "denied") {
+      return set("blocked in your browser. Open site settings (the lock/⋮ icon in the address bar → Notifications) → Allow, then tap the bell again");
+    }
     const perm = await Notification.requestPermission();
-    if (perm !== "granted") return set("notifications are blocked");
+    if (perm === "denied") return set("you chose Block. Reset it in site settings (lock icon → Notifications → Allow), then tap again");
+    if (perm !== "granted") return set("permission dismissed — tap the bell again and choose Allow");
     const reg = await navigator.serviceWorker.register("/sw.js");
     await navigator.serviceWorker.ready;
     const { key } = await (await fetch("/api/push/key")).json();
@@ -381,7 +394,10 @@ async function enablePush() {
       localStorage.setItem(PUSH_ON_KEY, "1");
       refreshPushUI();
     } else { set(data.error || "could not enable"); }
-  } catch { set("could not enable browser alerts"); }
+  } catch (e) {
+    // Surface the real reason instead of a generic failure (helps debugging).
+    set("couldn't enable: " + ((e && (e.message || e.name)) || "unknown error"));
+  }
 }
 async function disablePush() {
   try {
