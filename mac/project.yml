@@ -1,0 +1,27 @@
+name: OutageObserver
+options:
+  bundleIdPrefix: observer.outage
+  deploymentTarget:
+    macOS: "13.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+    ENABLE_HARDENED_RUNTIME: YES
+targets:
+  OutageObserver:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources
+      - path: Resources/DepartureMono-Regular.otf
+      - path: Resources/AppIcon.icns
+    settings:
+      base:
+        PRODUCT_NAME: "Outage Observer"
+        PRODUCT_BUNDLE_IDENTIFIER: observer.outage.mac
+        INFOPLIST_FILE: Resources/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Resources/OutageObserver.entitlements
+        CODE_SIGN_STYLE: Automatic
