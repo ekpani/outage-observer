@@ -27,7 +27,7 @@ agent (`LSUIElement`), so it has no Dock icon; set `LSUIElement` to `false` in
 
 ## Build & run
 
-Requires macOS 13+, Xcode, and [XcodeGen](https://github.com/yonom/XcodeGen)
+Requires macOS 14+, Xcode, and [XcodeGen](https://github.com/yonom/XcodeGen)
 (`brew install xcodegen`). The Xcode project is generated from `project.yml`.
 
 ```sh

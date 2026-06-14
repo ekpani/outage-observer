@@ -95,18 +95,11 @@ struct MenuContentView: View {
         .buttonStyle(.plain)
     }
 
-    @ViewBuilder private var settingsButton: some View {
-        if #available(macOS 14, *) {
-            SettingsLink {
-                Image(systemName: "gearshape").font(.system(size: 12)).foregroundStyle(Theme.textMuted).frame(width: 22, height: 22)
-            }
-            .buttonStyle(.plain)
-        } else {
-            iconButton("gearshape") {
-                NSApp.activate(ignoringOtherApps: true)
-                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-            }
+    private var settingsButton: some View {
+        SettingsLink {
+            Image(systemName: "gearshape").font(.system(size: 12)).foregroundStyle(Theme.textMuted).frame(width: 22, height: 22)
         }
+        .buttonStyle(.plain)
     }
 
     private func openMain() {

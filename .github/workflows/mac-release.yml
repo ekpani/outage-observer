@@ -43,4 +43,4 @@ jobs:
             Outage Observer for Mac — menu-bar status + notifications.
 
             Unsigned build: on first launch, right-click the app → **Open** to get
-            past Gatekeeper. Requires macOS 13+.
+            past Gatekeeper. Requires macOS 14+.
