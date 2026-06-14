@@ -90,14 +90,16 @@ function rowHtml(p, stack, mode) {
   const incident = p.incident && p.incident.name
     ? `<span class="incident" title="${esc(p.incident.name)}">${esc(p.incident.name)}</span>`
     : '<span class="incident"></span>';
-  const href = p.home ? esc(p.home) : "#";
+  // Row links to the provider's Outage Observer page (which itself links out to
+  // the vendor's official status page). Internal nav, same tab.
+  const href = "/status/" + encodeURIComponent(p.id);
   // On the board, every row is yours, so the control is an explicit Remove (×).
   // In the picker it's an add / added toggle.
   const control = mode === "board"
     ? `<button class="pin remove" data-id="${esc(p.id)}" aria-label="Remove ${esc(p.name)} from your board" title="Remove from board">${X}</button>`
     : `<button class="pin ${pinned ? "pinned" : ""}" data-id="${esc(p.id)}" aria-pressed="${pinned}" aria-label="${pinned ? "Remove from" : "Add to"} board" title="${pinned ? "Remove from" : "Add to"} board">${pinned ? STAR : PLUS}</button>`;
   return `<div class="row ${pinned ? "added" : ""}" data-name="${esc(p.name.toLowerCase())}">`
-    + `<a class="row-main" href="${href}" target="_blank" rel="noopener noreferrer">`
+    + `<a class="row-main" href="${href}">`
     + logoTile(p)
     + `<span class="name">${esc(p.name)}</span>`
     + badge(p.level)
@@ -109,8 +111,8 @@ function rowHtml(p, stack, mode) {
 
 // ---- Scoped summary: answers "is anything *I* depend on broken?" ----
 function chip(p) {
-  const href = p.home ? esc(p.home) : "#";
-  return `<a class="chip-status status-${p.level}" href="${href}" target="_blank" rel="noopener noreferrer">`
+  const href = "/status/" + encodeURIComponent(p.id);
+  return `<a class="chip-status status-${p.level}" href="${href}">`
     + glyph(p.level) + `<span>${esc(p.name)}</span></a>`;
 }
 
