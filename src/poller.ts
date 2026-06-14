@@ -1,6 +1,7 @@
 import { CATALOG, PRIORITY_IDS, type Provider } from "./catalog";
 import { fetchStatus, SEVERITY, type Level, type ProviderStatus } from "./adapters";
-import { getBoard, setBoard, enqueueNotification, drainOutbox, recordHistory, setCheckedAt, type Board, type BoardEntry } from "./store";
+import { getBoard, setBoard, enqueueNotification, drainOutbox, recordHistory, setCheckedAt, getTargetsForProvider, enqueueTargetEvent, drainTargetOutbox, type Board, type BoardEntry } from "./store";
+import { type AlertEvent } from "./channels";
 import { type Env } from "./telegram";
 import { EMOJI, LABEL } from "./labels";
 
@@ -99,8 +100,11 @@ export async function applyResults(
   // subscribers watching that provider (one indexed D1 query) and enqueue a
   // message per subscriber. Enqueuing is cheap (DB writes, not subrequests), so
   // even a wide outage can't blow the budget here.
+  const homeById = new Map(CATALOG.map((p) => [p.id, p.link ?? p.url] as const));
   for (const t of transitions) {
     await recordHistory(env, t.id, t.to);
+
+    // Telegram subscribers (unchanged path).
     const { results } = await env.DB
       .prepare("SELECT chat_id FROM subscriptions WHERE provider_id = ?")
       .bind(t.id)
@@ -109,13 +113,29 @@ export async function applyResults(
     for (const row of results) {
       await enqueueNotification(env, row.chat_id, text);
     }
+
+    // Non-Telegram targets (web push, Slack/Discord) via the shared substrate.
+    const targets = await getTargetsForProvider(env, t.id);
+    if (targets.length) {
+      const event: AlertEvent = {
+        id: t.id,
+        name: t.name,
+        level: t.to,
+        from: t.from,
+        url: homeById.get(t.id) ?? "https://outage.observer/",
+        incident: t.status.incidents[0]?.name,
+      };
+      const payload = JSON.stringify(event);
+      for (const target of targets) await enqueueTargetEvent(env, target.id, payload);
+    }
   }
 
-  // Drain a bounded batch of queued messages every invocation — including ticks
-  // with no transitions — so any backlog flushes over subsequent cron ticks
-  // (cron runs every minute). The cap keeps sends within the shared
-  // 50-subrequest budget alongside the ~31 status fetches in this poll.
-  await drainOutbox(env, 10);
+  // Drain bounded batches every invocation — including ticks with no transitions
+  // — so any backlog flushes over subsequent cron ticks (runs every minute). The
+  // caps keep external sends within the shared 50-subrequest budget alongside the
+  // ~31 status fetches in this poll.
+  await drainOutbox(env, 8);
+  await drainTargetOutbox(env, 6);
 
   return transitions.length;
 }

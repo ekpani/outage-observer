@@ -1,5 +1,6 @@
 import { sendMessage, type Env } from "./telegram";
 import type { Level } from "./adapters";
+import { deliver, type AlertEvent } from "./channels";
 
 const BOARD_KEY = "board";
 
@@ -194,6 +195,121 @@ export async function getHistory(
     .bind(limit)
     .all<HistoryEvent>();
   return results;
+}
+
+// ---------- Delivery targets (D1, non-Telegram channels) ----------
+//
+// A channel-agnostic substrate parallel to the Telegram tables above (which are
+// left untouched). A "target" is one destination (a web-push browser, or a
+// Slack/Discord webhook); `target_subs` records which providers it wants; fan-out
+// reverse-looks-up by provider and enqueues into `target_outbox`, drained bounded.
+
+export interface Target {
+  id: number;
+  channel: string;
+  address: string;
+  meta: string | null;
+}
+
+/** Create or update a target (keyed on channel+address). Returns its id and a
+ *  stable opaque token used to manage/unsubscribe it later. */
+export async function upsertTarget(
+  env: Env,
+  channel: string,
+  address: string,
+  meta: string | null,
+): Promise<{ id: number; token: string }> {
+  const token = crypto.randomUUID();
+  const row = await env.DB
+    .prepare(
+      `INSERT INTO targets (channel, address, meta, token, created_at)
+       VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT(channel, address) DO UPDATE SET meta = excluded.meta
+       RETURNING id, token`,
+    )
+    .bind(channel, address, meta, token, Date.now())
+    .first<{ id: number; token: string }>();
+  return row ?? { id: 0, token };
+}
+
+/** Replace a target's watched providers (deduped). */
+export async function setTargetSubs(env: Env, targetId: number, providerIds: string[]): Promise<void> {
+  const unique = [...new Set(providerIds)];
+  const stmts = [env.DB.prepare("DELETE FROM target_subs WHERE target_id = ?").bind(targetId)];
+  const insert = env.DB.prepare("INSERT OR IGNORE INTO target_subs (target_id, provider_id) VALUES (?, ?)");
+  for (const pid of unique) stmts.push(insert.bind(targetId, pid));
+  await env.DB.batch(stmts);
+}
+
+async function deleteTargetId(env: Env, id: number): Promise<void> {
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM target_subs WHERE target_id = ?").bind(id),
+    env.DB.prepare("DELETE FROM target_outbox WHERE target_id = ?").bind(id),
+    env.DB.prepare("DELETE FROM targets WHERE id = ?").bind(id),
+  ]);
+}
+
+export async function deleteTargetByToken(env: Env, token: string): Promise<boolean> {
+  const t = await env.DB.prepare("SELECT id FROM targets WHERE token = ?").bind(token).first<{ id: number }>();
+  if (!t) return false;
+  await deleteTargetId(env, t.id);
+  return true;
+}
+
+export async function getTargetsForProvider(env: Env, providerId: string): Promise<Target[]> {
+  const { results } = await env.DB
+    .prepare(
+      `SELECT t.id, t.channel, t.address, t.meta
+       FROM target_subs s JOIN targets t ON t.id = s.target_id
+       WHERE s.provider_id = ?`,
+    )
+    .bind(providerId)
+    .all<Target>();
+  return results;
+}
+
+export async function enqueueTargetEvent(env: Env, targetId: number, payload: string): Promise<void> {
+  await env.DB
+    .prepare("INSERT INTO target_outbox (target_id, payload, created_at, sent) VALUES (?, ?, ?, 0)")
+    .bind(targetId, payload)
+    .run();
+}
+
+/** Drain up to `max` queued target messages. Delivers per channel; marks
+ *  delivered and permanently-failed rows sent, leaves transient failures queued,
+ *  and removes targets whose endpoint is gone (404/410). Returns count sent. */
+export async function drainTargetOutbox(env: Env, max: number): Promise<number> {
+  const { results } = await env.DB
+    .prepare(
+      `SELECT o.id, o.payload, t.id AS target_id, t.channel, t.address, t.meta
+       FROM target_outbox o JOIN targets t ON t.id = o.target_id
+       WHERE o.sent = 0 ORDER BY o.id LIMIT ?`,
+    )
+    .bind(max)
+    .all<{ id: number; payload: string; target_id: number; channel: string; address: string; meta: string | null }>();
+  if (results.length === 0) return 0;
+
+  const done: number[] = [];
+  const goneTargets = new Set<number>();
+  let sent = 0;
+  for (const row of results) {
+    try {
+      const event = JSON.parse(row.payload) as AlertEvent;
+      const result = await deliver(env, { channel: row.channel, address: row.address, meta: row.meta }, event);
+      if (result === "ok") { done.push(row.id); sent++; }
+      else if (result === "gone") { done.push(row.id); goneTargets.add(row.target_id); }
+      // "retry": leave queued for a later tick.
+    } catch (err) {
+      console.warn("target send failed", { id: row.id, error: String(err) });
+    }
+  }
+
+  if (done.length) {
+    const placeholders = done.map(() => "?").join(",");
+    await env.DB.prepare(`UPDATE target_outbox SET sent = 1 WHERE id IN (${placeholders})`).bind(...done).run();
+  }
+  for (const id of goneTargets) await deleteTargetId(env, id);
+  return sent;
 }
 
 // ---------- Meta (D1 key/value) ----------

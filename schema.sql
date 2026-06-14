@@ -55,3 +55,40 @@ CREATE TABLE IF NOT EXISTS meta (
   key   TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
+
+-- ----------------------------------------------------------------------------
+-- Non-Telegram delivery targets (web-push browsers, Slack/Discord webhooks).
+-- A parallel, channel-agnostic substrate so the Telegram path above stays
+-- untouched. Fan-out reverse-looks-up target_subs by provider, enqueues into
+-- target_outbox, and a bounded drain delivers per channel.
+-- ----------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS targets (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  channel    TEXT    NOT NULL,            -- 'webpush' | 'slack' | 'discord'
+  address    TEXT    NOT NULL,            -- push endpoint URL, or webhook URL
+  meta       TEXT,                        -- JSON (web-push keys {p256dh,auth}); else NULL
+  token      TEXT    NOT NULL,            -- opaque manage/unsubscribe token
+  created_at INTEGER NOT NULL
+);
+-- One target per (channel, address); re-subscribing updates it.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_targets_addr ON targets (channel, address);
+
+-- Which providers each target wants alerts for. Reverse lookup on fan-out.
+CREATE TABLE IF NOT EXISTS target_subs (
+  target_id   INTEGER NOT NULL,
+  provider_id TEXT    NOT NULL,
+  PRIMARY KEY (target_id, provider_id)
+);
+CREATE INDEX IF NOT EXISTS idx_target_subs_provider ON target_subs (provider_id);
+
+-- Durable outbox for non-Telegram channels. Stores a neutral event payload
+-- (JSON) so each channel can format at send time. Bounded drain like `outbox`.
+CREATE TABLE IF NOT EXISTS target_outbox (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  target_id  INTEGER NOT NULL,
+  payload    TEXT    NOT NULL,
+  created_at INTEGER NOT NULL,
+  sent       INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_target_outbox_sent ON target_outbox (sent, id);

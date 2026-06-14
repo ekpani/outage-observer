@@ -258,6 +258,31 @@ body[data-view="browse"] .row.added .row-main { box-shadow: inset 2px 0 0 var(--
 .empty .e-title { font-weight: var(--oo-weight-semibold); font-size: 15px; color: var(--oo-text-secondary); margin-top: 10px; }
 .empty .e-line { font-size: 12px; color: var(--oo-text-muted); margin-top: 4px; }
 
+/* ---- Get-alerts panel (Slack/Discord webhook; web-push bell added alongside) ---- */
+.notify {
+  margin-top: var(--oo-space-5);
+  background: var(--oo-bg-surface); border: var(--oo-border-width) solid var(--oo-border);
+  border-radius: var(--oo-radius-xl); padding: 18px 20px; box-shadow: var(--oo-shadow-sm);
+}
+.notify-title { font-weight: var(--oo-weight-semibold); font-size: 15px; }
+.notify-sub { font-size: 12.5px; color: var(--oo-text-muted); margin-top: 4px; }
+.notify-row { display: flex; gap: 10px; margin-top: 14px; }
+.hook-input {
+  flex: 1; min-width: 0; font-family: var(--oo-font-mono); font-size: 13px;
+  background: var(--oo-bg-sunken); color: var(--oo-text-primary);
+  border: 1px solid var(--oo-border); border-radius: var(--oo-radius-md); padding: 8px 11px; outline: none;
+}
+.hook-input::placeholder { color: var(--oo-text-muted); }
+.hook-input:focus-visible { box-shadow: 0 0 0 3px var(--oo-focus-ring); border-color: var(--oo-accent); }
+.notify-msg { font-family: var(--oo-font-mono); font-size: 12px; margin-top: 10px; min-height: 1em; color: var(--oo-text-muted); }
+.notify-msg.ok { color: var(--oo-status-operational-fg); }
+.notify-msg.err { color: var(--oo-status-major_outage-fg); }
+@media (max-width: 600px) {
+  .notify { padding: 16px 14px; }
+  .notify-row { flex-wrap: wrap; }
+  .notify-row .btn { width: 100%; justify-content: center; }
+}
+
 /* ---- Footer ---- */
 .page-foot { margin-top: var(--oo-space-5); text-align: center; color: var(--oo-text-muted); font-size: 11px; }
 .page-foot a { color: var(--oo-text-secondary); }

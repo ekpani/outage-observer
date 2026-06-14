@@ -232,6 +232,8 @@ function render() {
   const stack = getStack();
   const rss = document.getElementById("rss-link");
   if (rss) rss.href = stack.size ? "/feed.xml?ids=" + [...stack].join(",") : "/feed.xml";
+  const notify = document.getElementById("notify");
+  if (notify) notify.hidden = stack.size === 0;   // connect alerts once you have a stack
   if (VIEW === null) VIEW = stack.size ? "board" : "browse";
   if (stack.size === 0) VIEW = "browse";   // no stack -> always the picker
 
@@ -288,6 +290,39 @@ document.addEventListener("click", (e) => {
   if (e.target.closest("#theme")) toggleTheme();
 });
 document.getElementById("filter").addEventListener("input", applyFilter);
+
+// Connect a Slack/Discord incoming webhook to the current My Stack.
+async function connectWebhook() {
+  const input = document.getElementById("hook-url");
+  const msg = document.getElementById("hook-msg");
+  const btn = document.getElementById("hook-connect");
+  const url = (input.value || "").trim();
+  const providers = [...getStack()];
+  const setMsg = (t, cls) => { msg.textContent = t; msg.className = "notify-msg" + (cls ? " " + cls : ""); };
+  if (!url) return setMsg("Paste a Slack or Discord webhook URL first.", "err");
+  if (!providers.length) return setMsg("Add services to My Stack first.", "err");
+  setMsg("Connecting…");
+  btn.disabled = true;
+  try {
+    const res = await fetch("/api/webhook/subscribe", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ url, providers }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.ok) {
+      setMsg(`Connected to ${data.kind}. Watching ${data.count} service${data.count > 1 ? "s" : ""} — check the channel for a confirmation.`, "ok");
+      input.value = "";
+    } else {
+      setMsg(data.error || "Could not connect. Check the URL and try again.", "err");
+    }
+  } catch {
+    setMsg("Network error. Try again.", "err");
+  }
+  btn.disabled = false;
+}
+const hookBtn = document.getElementById("hook-connect");
+if (hookBtn) hookBtn.addEventListener("click", connectWebhook);
 
 async function load() {
   try {

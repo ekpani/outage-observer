@@ -1,9 +1,18 @@
 import { poll } from "./poller";
-import { getBoard, getCheckedAt } from "./store";
+import { getBoard, getCheckedAt, upsertTarget, setTargetSubs, deleteTargetByToken } from "./store";
 import { type Env } from "./telegram";
 import { onUpdate } from "./bot";
 import { handleIngest } from "./ingest";
 import { handleFeed } from "./feed";
+import { detectWebhookKind, sendWebhookConfirmation } from "./channels";
+import { CATALOG } from "./catalog";
+
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json; charset=utf-8" },
+  });
+}
 
 export default {
   async scheduled(
@@ -49,6 +58,36 @@ export default {
     if (request.method === "GET" && (url.pathname === "/feed" || url.pathname === "/feed.xml" || url.pathname.startsWith("/feed/"))) {
       const feed = await handleFeed(env, url);
       if (feed) return feed;
+    }
+
+    // Connect a Slack/Discord incoming webhook to a set of providers (the
+    // caller's "My Stack"). POSTed from the board, same-origin (no CORS needed).
+    if (url.pathname === "/api/webhook/subscribe" && request.method === "POST") {
+      let body: { url?: string; providers?: unknown };
+      try { body = await request.json(); } catch { return json({ error: "Bad JSON." }, 400); }
+      const hookUrl = String(body?.url ?? "").trim();
+      const kind = detectWebhookKind(hookUrl);
+      if (!kind) return json({ error: "Unrecognized URL. Paste a Slack or Discord incoming-webhook URL." }, 400);
+      const valid = new Set(CATALOG.map((p) => p.id));
+      const providers = Array.isArray(body?.providers) ? (body.providers as unknown[]).map(String).filter((x) => valid.has(x)) : [];
+      if (!providers.length) return json({ error: "Add at least one service to My Stack first." }, 400);
+
+      const { id, token } = await upsertTarget(env, kind, hookUrl, null);
+      await setTargetSubs(env, id, providers);
+      // Best-effort confirmation; if the endpoint rejects it, undo and report.
+      const result = await sendWebhookConfirmation(kind, hookUrl, providers.length).catch(() => "retry" as const);
+      if (result === "gone") {
+        await deleteTargetByToken(env, token);
+        return json({ error: `That webhook URL was rejected by ${kind}.` }, 400);
+      }
+      return json({ ok: true, kind, token, count: providers.length });
+    }
+
+    if (url.pathname === "/api/webhook/unsubscribe" && request.method === "POST") {
+      let body: { token?: string };
+      try { body = await request.json(); } catch { return json({ error: "Bad JSON." }, 400); }
+      const ok = await deleteTargetByToken(env, String(body?.token ?? ""));
+      return json({ ok });
     }
 
     // Telegram webhook
