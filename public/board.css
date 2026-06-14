@@ -29,40 +29,49 @@ body {
 
 .wrap { max-width: 860px; margin: 0 auto; padding: var(--oo-space-12) var(--oo-space-4) var(--oo-space-16); position: relative; }
 
-/* ---- Background radar scope (decorative). Fixed and viewport-centered, painted
-   behind all content; the opaque board sits on top as a safezone, so the sweep
-   only shows in the margins around it. Tied to the operational green, very faint,
-   and frozen by the global prefers-reduced-motion rule in tokens.css. ---- */
+/* ---- Background radar scope (decorative). A full-viewport layer painted behind
+   all content; the opaque board sits on top as a safezone, so the rings + sweep
+   only show in the margins around it. Origin is off-center (lower-right, like the
+   OG card) but the concentric rings and the sweep span the WHOLE screen from
+   there, fading out only near the far corner. Tied to the operational green,
+   very faint, and frozen by the global prefers-reduced-motion rule. ---- */
 .radar {
   --radar-line: color-mix(in srgb, var(--oo-status-operational-fg) 8%, transparent);
-  --radar-sweep: color-mix(in srgb, var(--oo-status-operational-fg) 16%, transparent);
+  --radar-sweep: color-mix(in srgb, var(--oo-status-operational-fg) 15%, transparent);
   --radar-pupil: color-mix(in srgb, var(--oo-status-operational-fg) 26%, transparent);
+  --ox: 84%;   /* origin: lower-right beacon */
+  --oy: 78%;
   position: fixed;
-  /* Origin in the lower-right, like the OG card, so the scope reads as a beacon
-     beside the board instead of hiding behind its center. */
-  top: 76%;
-  left: 85%;
-  width: 116vmax;
-  height: 116vmax;
-  transform: translate(-50%, -50%);
+  inset: 0;
   z-index: -1;
   pointer-events: none;
-  border-radius: 50%;
+  overflow: hidden;
   background:
-    radial-gradient(circle at center, var(--radar-pupil) 0, transparent 2.2vmax),
-    repeating-radial-gradient(circle at center, var(--radar-line) 0 1px, transparent 1px 5vmax);
-  -webkit-mask: radial-gradient(circle at center, #000 0%, #000 4%, transparent 56%);
-  mask: radial-gradient(circle at center, #000 0%, #000 4%, transparent 56%);
+    radial-gradient(circle at var(--ox) var(--oy), var(--radar-pupil) 0, transparent 2.4vmax),
+    repeating-radial-gradient(circle at var(--ox) var(--oy), var(--radar-line) 0 1px, transparent 1px 5.5vmax);
+  /* Opaque across the screen, fading only as it approaches the farthest corner. */
+  -webkit-mask: radial-gradient(circle at var(--ox) var(--oy), #000 0%, #000 64%, transparent 100%);
+  mask: radial-gradient(circle at var(--ox) var(--oy), #000 0%, #000 64%, transparent 100%);
 }
+/* The sweep is a circle large enough to cover the screen from the off-center
+   origin; rotating it sweeps the whole viewport. Its own radial fade keeps the
+   wedge brightest near the beacon and soft toward the edges. */
 .radar-sweep {
   position: absolute;
-  inset: 0;
+  left: var(--ox);
+  top: var(--oy);
+  width: 300vmax;
+  height: 300vmax;
+  margin-left: -150vmax;
+  margin-top: -150vmax;
   border-radius: 50%;
   background: conic-gradient(from 0deg,
     var(--radar-sweep) 0deg,
-    color-mix(in srgb, var(--radar-sweep) 35%, transparent) 16deg,
-    transparent 46deg,
+    color-mix(in srgb, var(--radar-sweep) 35%, transparent) 18deg,
+    transparent 50deg,
     transparent 360deg);
+  -webkit-mask: radial-gradient(circle at center, #000 0, #000 18vmax, transparent 78vmax);
+  mask: radial-gradient(circle at center, #000 0, #000 18vmax, transparent 78vmax);
   animation: radar-spin 11s linear infinite;
 }
 @keyframes radar-spin {
@@ -281,13 +290,17 @@ body[data-view="browse"] .row.added .row-main { box-shadow: inset 2px 0 0 var(--
   .row .name { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .row .incident { display: none; }
   .row .pin { margin-right: 8px; }
-  /* The board fills the screen on mobile, so the bottom-right beacon only peeks
-     at the corner: boost intensity + visible radius so it still reads. */
+  /* The board fills more of the screen on mobile, so boost intensity and keep
+     the rings opaque further out so the full-screen sweep still reads. */
   .radar {
     --radar-line: color-mix(in srgb, var(--oo-status-operational-fg) 13%, transparent);
-    --radar-sweep: color-mix(in srgb, var(--oo-status-operational-fg) 30%, transparent);
+    --radar-sweep: color-mix(in srgb, var(--oo-status-operational-fg) 28%, transparent);
     --radar-pupil: color-mix(in srgb, var(--oo-status-operational-fg) 40%, transparent);
-    -webkit-mask: radial-gradient(circle at center, #000 0%, #000 5%, transparent 66%);
-    mask: radial-gradient(circle at center, #000 0%, #000 5%, transparent 66%);
+    -webkit-mask: radial-gradient(circle at var(--ox) var(--oy), #000 0%, #000 74%, transparent 100%);
+    mask: radial-gradient(circle at var(--ox) var(--oy), #000 0%, #000 74%, transparent 100%);
+  }
+  .radar-sweep {
+    -webkit-mask: radial-gradient(circle at center, #000 0, #000 26vmax, transparent 96vmax);
+    mask: radial-gradient(circle at center, #000 0, #000 26vmax, transparent 96vmax);
   }
 }
