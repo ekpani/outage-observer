@@ -119,6 +119,54 @@ body {
 .summary .s-title { font-weight: var(--oo-weight-semibold); font-size: 18px; letter-spacing: -.01em; }
 .summary .s-sub { font-family: var(--oo-font-mono); font-size: 11.5px; color: var(--oo-text-muted); letter-spacing: var(--oo-tracking-mono); margin-top: 3px; }
 .summary .pulse-dot { width: 9px; height: 9px; border-radius: 999px; background: var(--oo-status-operational-fg); margin-left: auto; box-shadow: var(--oo-glow-operational); animation: oo-pulse 2.6s ease-in-out infinite; }
+.summary.loud { align-items: flex-start; }
+.summary .s-body { min-width: 0; }
+/* Affected services named inline, so "needs attention" always answers "which?" */
+.summary .affected { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.chip-status {
+  display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px 5px 9px;
+  border-radius: var(--oo-radius-full); text-decoration: none; white-space: nowrap;
+  font-family: var(--oo-font-mono); font-size: 12px; letter-spacing: var(--oo-tracking-mono);
+  border: 1px solid transparent;
+}
+.chip-status:hover { border-color: currentColor; }
+.chip-status .glyph { flex: none; }
+
+/* ---- Picker / onboarding header (browse view) ---- */
+.pick-head { padding: 22px 22px 20px; border-bottom: 1px solid var(--oo-border); }
+.pick-head .ph-title { font-weight: var(--oo-weight-semibold); font-size: 19px; letter-spacing: -.01em; }
+.pick-head .ph-sub { font-size: 13px; color: var(--oo-text-muted); margin-top: 7px; max-width: 56ch; line-height: 1.55; }
+.pick-head .ph-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 16px; }
+.ph-stat { color: var(--oo-text-muted); font-size: 11px; }
+.btn {
+  font-family: var(--oo-font-mono); font-size: 13px; letter-spacing: var(--oo-tracking-mono);
+  border-radius: var(--oo-radius-md); padding: 8px 14px; cursor: pointer;
+  border: 1px solid var(--oo-border-strong); background: var(--oo-bg-elevated);
+  color: var(--oo-text-primary); display: inline-flex; align-items: center; gap: 7px;
+}
+.btn:hover { border-color: var(--oo-border-strong); color: var(--oo-text-primary); background: var(--oo-bg-surface); }
+.btn:focus-visible { box-shadow: 0 0 0 3px var(--oo-focus-ring); outline: none; }
+.btn-primary {
+  border-color: var(--oo-accent); color: var(--oo-accent);
+  background: color-mix(in srgb, var(--oo-accent) 12%, transparent);
+}
+.btn-primary:hover { color: var(--oo-accent); background: color-mix(in srgb, var(--oo-accent) 20%, transparent); }
+.btn-primary .glyph, .btn svg { flex: none; }
+
+/* Global health strip atop the browse list (awareness without alarm). */
+.browse-stat { display: flex; align-items: center; gap: 8px; padding: 12px 22px; font-size: 12px; color: var(--oo-text-muted); border-bottom: 1px solid var(--oo-border); background: var(--oo-bg-sunken); }
+.browse-stat .bs-time { margin-left: auto; }
+
+/* ---- Browse CTA on the board (the rest is one tap away) ---- */
+.browse-cta {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  padding: 16px 22px; cursor: pointer; border: none; border-top: 1px solid var(--oo-border);
+  background: var(--oo-bg-sunken); color: var(--oo-text-secondary);
+  font-family: var(--oo-font-mono); font-size: 13px; letter-spacing: var(--oo-tracking-mono);
+}
+.browse-cta:hover { color: var(--oo-accent); background: var(--oo-bg-elevated); }
+.browse-cta svg { flex: none; }
+.browse-cta .ml { margin-left: auto; color: var(--oo-text-muted); font-size: 11px; }
 
 /* ---- Category header ---- */
 .cat { display: flex; align-items: center; gap: var(--oo-space-3); padding: 15px 22px 9px; background: var(--oo-bg-sunken); }
@@ -158,6 +206,8 @@ body {
 .row .pin:hover { color: var(--oo-text-secondary); }
 .row .pin.pinned { color: var(--oo-accent); }
 .row .pin:focus-visible { box-shadow: 0 0 0 3px var(--oo-focus-ring); outline: none; }
+/* In the picker, a left accent marks services already on your board. */
+body[data-view="browse"] .row.added .row-main { box-shadow: inset 2px 0 0 var(--oo-accent); }
 
 /* ---- Status badge ---- */
 .status-badge { display: inline-flex; gap: 6px; align-items: center; padding: 4px 10px 4px 8px; border-radius: var(--oo-radius-full); font: var(--oo-weight-medium) 12px/1 var(--oo-font-sans); flex: none; white-space: nowrap; }
@@ -199,6 +249,10 @@ body {
   .summary .s-title { font-size: 16px; }
   .summary .s-sub { font-size: 11px; }
   .cat { padding: 14px 14px 8px; }
+  .pick-head { padding: 16px 14px; }
+  .browse-stat { padding: 11px 14px; }
+  .browse-cta { padding: 14px; }
+  .summary .affected { gap: 6px; }
   .row-main { padding: 12px 8px 12px 14px; gap: var(--oo-space-2); }
   .row .name { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .row .incident { display: none; }

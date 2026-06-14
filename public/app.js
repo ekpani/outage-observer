@@ -1,5 +1,7 @@
 // Outage Observer — board renderer. Fetches the Worker's /api/status snapshot
-// and renders the categorized board. "My Stack" is localStorage-only (no auth).
+// and renders a personal board. "My Stack" is localStorage-only (no auth):
+// pick the services you depend on, the top banner is scoped to just those, and
+// the full catalog stays one tap away for adding more or browsing.
 
 const CATEGORY_ORDER = [
   "Cloud & hosting", "Dev & CI", "Data & backend", "Payments", "Comms",
@@ -11,7 +13,19 @@ const LABELS = {
   operational: "Operational", maintenance: "Maintenance", degraded: "Degraded",
   partial_outage: "Partial outage", major_outage: "Major outage", unknown: "Unknown",
 };
+// How a single service reads in a sentence ("Stripe is down"). No em-dashes.
+const PHRASE = {
+  operational: "back to normal", maintenance: "in maintenance", degraded: "degraded",
+  partial_outage: "partly down", major_outage: "down", unknown: "not reporting",
+};
 const SEV = { operational: 0, maintenance: 1, degraded: 2, partial_outage: 3, major_outage: 4, unknown: -1 };
+
+// The 16 most-depended providers (mirrors PRIORITY_IDS in the Worker). The
+// onboarding "essentials" shortcut seeds these.
+const ESSENTIALS = [
+  "aws", "gcp", "azure", "cloudflare", "vercel", "netlify", "github", "npm",
+  "openai", "anthropic", "stripe", "slack", "discord", "twilio", "supabase", "mongodb",
+];
 
 // Glyph set from the design system (16x16, currentColor inherits the status fg).
 const GLYPHS = {
@@ -23,6 +37,8 @@ const GLYPHS = {
   unknown: '<circle cx="8" cy="8" r="4.3" fill="none" stroke="currentColor" stroke-width="2"/>',
 };
 const STAR = '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 1.7l1.8 3.9 4.2.4-3.1 2.9.9 4.2L8 11.9 4.2 13.9l.9-4.2L2 6.8l4.2-.4z" fill="currentColor"/></svg>';
+const PLUS = '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 3 V13 M3 8 H13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+const ARROW = '<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M3 8 H12 M8.5 4.5 L12 8 L8.5 11.5" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
 // Provider id -> Simple Icons slug, only where they differ. Everything else
 // uses the id as-is; a missing icon 404s and app.js drops the <img> (onerror),
@@ -37,6 +53,7 @@ const STACK_KEY = "oo-stack";
 const THEME_KEY = "oo-theme";
 
 let BOARD = null;
+let VIEW = null;   // 'board' | 'browse'; null = decide from stack on first render
 
 function getStack() {
   try { return new Set(JSON.parse(localStorage.getItem(STACK_KEY) || "[]")); } catch { return new Set(); }
@@ -56,47 +73,126 @@ function glyph(level, size) {
 function badge(level) {
   return `<span class="status-badge status-${level}">${glyph(level)}<span>${LABELS[level] || "Unknown"}</span></span>`;
 }
+// A service needs attention if it is actively unhealthy. Unknown (not yet
+// fetched / a failed fetch) is neutral and never alarms — the no-fake-news rule.
+function needsAttention(p) {
+  return p.level !== "operational" && p.level !== "unknown";
+}
+function logoTile(p) {
+  const initial = (p.name[0] || "?").toUpperCase();
+  const slug = SLUGS[p.id] || p.id;
+  return `<span class="logo">${esc(initial)}<img src="https://cdn.simpleicons.org/${esc(slug)}/9aa0a6" alt="" loading="lazy" onerror="this.remove()"></span>`;
+}
 
 function rowHtml(p, stack) {
   const pinned = stack.has(p.id);
-  const initial = (p.name[0] || "?").toUpperCase();
   const incident = p.incident && p.incident.name
     ? `<span class="incident" title="${esc(p.incident.name)}">${esc(p.incident.name)}</span>`
     : '<span class="incident"></span>';
   const href = p.home ? esc(p.home) : "#";
-  const slug = SLUGS[p.id] || p.id;
-  return `<div class="row" data-name="${esc(p.name.toLowerCase())}">`
+  return `<div class="row ${pinned ? "added" : ""}" data-name="${esc(p.name.toLowerCase())}">`
     + `<a class="row-main" href="${href}" target="_blank" rel="noopener noreferrer">`
-    + `<span class="logo">${esc(initial)}<img src="https://cdn.simpleicons.org/${esc(slug)}/9aa0a6" alt="" loading="lazy" onerror="this.remove()"></span>`
+    + logoTile(p)
     + `<span class="name">${esc(p.name)}</span>`
     + badge(p.level)
     + incident
     + `</a>`
-    + `<button class="pin ${pinned ? "pinned" : ""}" data-id="${esc(p.id)}" aria-pressed="${pinned}" aria-label="${pinned ? "Remove from" : "Add to"} My Stack" title="${pinned ? "Remove from" : "Add to"} My Stack">${STAR}</button>`
+    + `<button class="pin ${pinned ? "pinned" : ""}" data-id="${esc(p.id)}" aria-pressed="${pinned}" aria-label="${pinned ? "Remove from" : "Add to"} My Stack" title="${pinned ? "Remove from" : "Add to"} My Stack">${pinned ? STAR : PLUS}</button>`
     + `</div>`;
 }
 
-function summaryHtml(providers, checked) {
-  const total = providers.length;
+// ---- Scoped summary: answers "is anything *I* depend on broken?" ----
+function chip(p) {
+  const href = p.home ? esc(p.home) : "#";
+  return `<a class="chip-status status-${p.level}" href="${href}" target="_blank" rel="noopener noreferrer">`
+    + glyph(p.level) + `<span>${esc(p.name)}</span></a>`;
+}
+
+function scopedSummary(tracked, checked) {
   const time = checked ? hhmm(checked) + " UTC" : "—";
-  const bad = providers.filter((p) => p.level !== "operational" && p.level !== "unknown");
+  const bad = tracked.filter(needsAttention).sort((a, b) => SEV[b.level] - SEV[a.level]);
+  const known = tracked.filter((p) => p.level !== "unknown");
+
   if (!bad.length) {
+    const sub = known.length
+      ? `${tracked.length} service${tracked.length > 1 ? "s" : ""} watched · checked ${time}`
+      : `checking your stack · ${time}`;
+    const title = known.length ? "All clear" : "Getting first reading";
     return '<div class="summary">'
       + `<div class="tile status-operational">${glyph("operational", 18)}</div>`
-      + `<div><div class="s-title">All systems normal</div><div class="s-sub">${total} services · checked ${time}</div></div>`
+      + `<div><div class="s-title">${title}</div><div class="s-sub">${sub}</div></div>`
       + '<span class="pulse-dot"></span></div>';
   }
-  let worst = "operational";
-  const counts = {};
-  for (const p of bad) { if (SEV[p.level] > SEV[worst]) worst = p.level; counts[p.level] = (counts[p.level] || 0) + 1; }
-  const parts = [];
-  for (const k of ["major_outage", "partial_outage", "degraded", "maintenance"]) {
-    if (counts[k]) parts.push(counts[k] + " " + LABELS[k].toLowerCase());
-  }
+
+  const worst = bad[0].level;
+  const title = bad.length === 1
+    ? `${esc(bad[0].name)} is ${PHRASE[bad[0].level]}`
+    : `${bad.length} of your services need attention`;
   return `<div class="summary loud" style="--summary-fg:var(--oo-status-${worst}-fg)">`
     + `<div class="tile status-${worst}">${glyph(worst, 18)}</div>`
-    + `<div><div class="s-title">${bad.length} service${bad.length > 1 ? "s" : ""} need attention</div>`
-    + `<div class="s-sub">${parts.join(" · ")} · ${time}</div></div></div>`;
+    + `<div class="s-body"><div class="s-title">${title}</div>`
+    + `<div class="s-sub">checked ${time}</div>`
+    + `<div class="affected">${bad.map(chip).join("")}</div></div></div>`;
+}
+
+// ---- Board view: your stack only, problems first ----
+function boardHtml(providers, stack, checked) {
+  const tracked = providers
+    .filter((p) => stack.has(p.id))
+    .sort((a, b) => SEV[b.level] - SEV[a.level] || a.name.localeCompare(b.name));
+
+  let html = scopedSummary(tracked, checked);
+  html += `<div class="cat mystack"><span class="star">${STAR}</span><span class="label">My Stack</span><span class="count mono">${tracked.length}</span><span class="rule"></span></div>`;
+  html += tracked.map((p) => rowHtml(p, stack)).join("");
+
+  const elsewhere = providers.filter((p) => !stack.has(p.id) && needsAttention(p)).length;
+  const note = elsewhere
+    ? `<span class="ml">${elsewhere} with incidents elsewhere</span>`
+    : `<span class="ml">${providers.length - tracked.length} more</span>`;
+  html += `<button class="browse-cta" data-act="browse">${PLUS}<span>Add or browse all services</span>${note}</button>`;
+  return html;
+}
+
+// ---- Browse / onboarding view: the full catalog as a tap-to-add picker ----
+function browseHtml(providers, stack, checked) {
+  const onboarding = stack.size === 0;
+  const incidents = providers.filter(needsAttention).length;
+
+  let head = '<div class="pick-head">';
+  if (onboarding) {
+    head += '<div class="ph-title">Build your board</div>'
+      + '<div class="ph-sub">Pick the services your product depends on. Outage Observer watches just those and surfaces trouble the moment it shows. Everything else stays out of your way.</div>'
+      + '<div class="ph-actions">'
+      + `<button class="btn btn-primary" data-act="essentials">⚡ Add the essentials</button>`
+      + '<span class="ph-stat mono">16 most-depended services</span>'
+      + '</div>';
+  } else {
+    head += '<div class="ph-title">Add services</div>'
+      + '<div class="ph-sub">Star anything you want on your board. Your picks stay on this device.</div>'
+      + '<div class="ph-actions">'
+      + `<button class="btn btn-primary" data-act="board">View my board (${stack.size}) ${ARROW}</button>`
+      + `<button class="btn" data-act="essentials">⚡ Essentials</button>`
+      + '</div>';
+  }
+  head += '</div>';
+
+  const strip = `<div class="browse-stat mono">`
+    + (incidents
+      ? `${glyph("degraded")}<span>${incidents} service${incidents > 1 ? "s" : ""} reporting incidents right now</span>`
+      : `${glyph("operational")}<span>all ${providers.length} services operational</span>`)
+    + (checked ? `<span class="bs-time">checked ${hhmm(checked)} UTC</span>` : "")
+    + `</div>`;
+
+  let html = head + strip;
+  for (const cat of CATEGORY_ORDER) {
+    const inCat = providers.filter((p) => p.category === cat);
+    if (!inCat.length) continue;
+    const picked = inCat.filter((p) => stack.has(p.id)).length;
+    html += `<div class="cat"><span class="label">${esc(cat)}</span>`
+      + `<span class="count mono">${picked ? picked + "/" : ""}${inCat.length}</span><span class="rule"></span></div>`;
+    html += inCat.map((p) => rowHtml(p, stack)).join("");
+  }
+  return html;
 }
 
 function noData() {
@@ -128,26 +224,18 @@ function render() {
   if (!providers.length) { body.innerHTML = noData(); return; }
 
   const stack = getStack();
-  let html = summaryHtml(providers, checked);
+  if (VIEW === null) VIEW = stack.size ? "board" : "browse";
+  if (stack.size === 0) VIEW = "browse";   // no stack -> always the picker
 
-  // My Stack (pinned, localStorage)
-  const mine = providers.filter((p) => stack.has(p.id));
-  html += `<div class="cat mystack"><span class="star">${STAR}</span><span class="label">My Stack</span><span class="chip">saved locally</span><span class="rule"></span></div>`;
-  html += mine.length
-    ? mine.map((p) => rowHtml(p, stack)).join("")
-    : '<div class="hint mono">Star a service to pin it here.</div>';
+  body.innerHTML = VIEW === "browse"
+    ? browseHtml(providers, stack, checked)
+    : boardHtml(providers, stack, checked);
 
-  // Categories
-  for (const cat of CATEGORY_ORDER) {
-    const inCat = providers.filter((p) => p.category === cat);
-    if (!inCat.length) continue;
-    html += `<div class="cat"><span class="label">${esc(cat)}</span><span class="count mono">${inCat.length}</span><span class="rule"></span></div>`;
-    html += inCat.map((p) => rowHtml(p, stack)).join("");
-  }
-
-  body.innerHTML = html;
+  document.body.dataset.view = VIEW;
   applyFilter();
 }
+
+function setView(v) { VIEW = v; render(); }
 
 function applyFilter() {
   const q = (document.getElementById("filter").value || "").trim().toLowerCase();
@@ -164,6 +252,18 @@ function toggleTheme() {
 }
 
 document.addEventListener("click", (e) => {
+  const act = e.target.closest("[data-act]");
+  if (act) {
+    const a = act.dataset.act;
+    if (a === "browse") return setView("browse");
+    if (a === "board") return setView("board");
+    if (a === "essentials") {
+      const stack = getStack();
+      ESSENTIALS.forEach((id) => stack.add(id));
+      saveStack(stack);
+      return setView("board");
+    }
+  }
   const pin = e.target.closest(".pin");
   if (pin) {
     const id = pin.dataset.id;
