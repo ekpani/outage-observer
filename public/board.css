@@ -146,9 +146,11 @@ body {
   display: grid; place-items: center;
   font-family: var(--oo-font-mono); font-size: 12px; color: var(--oo-text-secondary);
 }
-/* Real logo (Simple Icons) overlays the monogram fallback; if it 404s, app.js
-   removes the <img> via onerror and the initial shows through. */
-.row .logo img { position: absolute; inset: 0; width: 100%; height: 100%; padding: 5px; object-fit: contain; }
+/* Real logo (Simple Icons) overlays the monogram fallback. The img carries the
+   tile's own background so it fully masks the letter (transparent parts of the
+   logo just read as the tile). If it 404s, app.js removes the <img> via onerror
+   and the initial shows through as the fallback. */
+.row .logo img { position: absolute; inset: 0; width: 100%; height: 100%; padding: 5px; object-fit: contain; background: var(--oo-bg-elevated); }
 .row .name { font-family: var(--oo-font-mono); font-size: 14px; color: var(--oo-text-primary); letter-spacing: var(--oo-tracking-mono); min-width: 140px; flex: none; }
 .row-main:hover .name { color: var(--oo-accent); }
 .row .incident { font-size: 13px; color: var(--oo-text-secondary); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
