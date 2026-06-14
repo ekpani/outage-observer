@@ -148,3 +148,21 @@ export async function drainOutbox(env: Env, max: number): Promise<number> {
   }
   return delivered.length;
 }
+
+// ---------- Status history (D1, append-only) ----------
+//
+// One row per provider transition. Append-only on purpose: D1 answers uptime /
+// last-incident / per-service queries today, and the same row shape can stream
+// to R2 Data Catalog (Iceberg) + R2 SQL later if the dataset ever outgrows D1.
+
+export async function recordHistory(
+  env: Env,
+  providerId: string,
+  level: string,
+  at: number = Date.now(),
+): Promise<void> {
+  await env.DB
+    .prepare("INSERT INTO history (provider_id, level, at) VALUES (?, ?, ?)")
+    .bind(providerId, level, at)
+    .run();
+}

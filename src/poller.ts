@@ -1,6 +1,6 @@
 import { CATALOG, PRIORITY_IDS, type Provider } from "./catalog";
 import { fetchStatus, SEVERITY, type Level, type ProviderStatus } from "./adapters";
-import { getBoard, setBoard, enqueueNotification, drainOutbox, type Board, type BoardEntry } from "./store";
+import { getBoard, setBoard, enqueueNotification, drainOutbox, recordHistory, type Board, type BoardEntry } from "./store";
 import { type Env } from "./telegram";
 import { EMOJI, LABEL } from "./labels";
 
@@ -98,6 +98,7 @@ export async function applyResults(
   // message per subscriber. Enqueuing is cheap (DB writes, not subrequests), so
   // even a wide outage can't blow the budget here.
   for (const t of transitions) {
+    await recordHistory(env, t.id, t.to);
     const { results } = await env.DB
       .prepare("SELECT chat_id FROM subscriptions WHERE provider_id = ?")
       .bind(t.id)

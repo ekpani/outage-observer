@@ -33,3 +33,17 @@ CREATE TABLE IF NOT EXISTS outbox (
 
 -- Find unsent messages in insertion order, cheaply.
 CREATE INDEX IF NOT EXISTS idx_outbox_sent ON outbox (sent, id);
+
+-- Status-change history: one append-only row per provider transition. Powers
+-- uptime %, last-incident, and per-service "is X down?" pages. Append-only by
+-- design, so it can later stream to R2 Data Catalog (Apache Iceberg) + R2 SQL
+-- for analytics at scale; until then D1 holds years of it and queries directly.
+CREATE TABLE IF NOT EXISTS history (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  provider_id TEXT    NOT NULL,
+  level       TEXT    NOT NULL,
+  at          INTEGER NOT NULL
+);
+
+-- Per-provider timeline lookups for uptime / incident queries.
+CREATE INDEX IF NOT EXISTS idx_history_provider_at ON history (provider_id, at);
