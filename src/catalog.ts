@@ -157,13 +157,22 @@ export const CATALOG: Provider[] = [
   { id: "segment", name: "Segment", category: "Analytics", adapter: "statuspage", url: "https://status.segment.com" },
 ];
 
-/** The most-depended-on providers: polled every minute (~1-min freshness and
- *  alert latency). Everything else rotates through ~6-minute shards. Tweak
- *  freely — this is just "what devs panic about first". */
+/** INTERNAL polling-freshness set only — NOT a user-facing "essentials" list.
+ *  These are polled every minute (~1-min freshness and alert latency); the rest
+ *  rotates through ~6-minute shards. Never surfaced in onboarding: we don't
+ *  decide what's essential to anyone. */
 export const PRIORITY_IDS = new Set<string>([
   "aws", "gcp", "azure", "cloudflare", "vercel", "netlify", "github", "npm",
   "openai", "anthropic", "stripe", "slack", "discord", "twilio", "supabase", "mongodb",
 ]);
+
+/** A short, neutral set of commonly-watched services offered as INDIVIDUAL
+ *  quick-adds in onboarding (tap one at a time). Not a bulk "add all", not a
+ *  blessed "essentials" — just a few suggestions to break the blank-page. The
+ *  web board mirrors this list in app.js. */
+export const POPULAR_IDS: string[] = [
+  "cloudflare", "aws", "github", "vercel", "openai", "anthropic", "stripe", "slack",
+];
 
 /** Display order for the board and the bot's onboarding picker. */
 export const CATEGORY_ORDER: string[] = [

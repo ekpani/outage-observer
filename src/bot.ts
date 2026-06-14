@@ -1,4 +1,5 @@
-import { CATALOG, CATEGORY_ORDER, PRIORITY_IDS, type Provider } from "./catalog";
+import { CATALOG, CATEGORY_ORDER, POPULAR_IDS, type Provider } from "./catalog";
+import { type Level } from "./adapters";
 import { EMOJI, LABEL } from "./labels";
 import { formatAlert } from "./poller";
 import {
@@ -16,6 +17,7 @@ import {
   answerCallback,
   type Env,
   type InlineKeyboard,
+  type InlineButton,
 } from "./telegram";
 
 const CAT_EMOJI: Record<string, string> = {
@@ -33,6 +35,8 @@ const CAT_EMOJI: Record<string, string> = {
   "Analytics": "📊",
 };
 
+const SEARCH_LIMIT = 8;
+
 function esc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
@@ -41,7 +45,53 @@ function providersIn(category: string): Provider[] {
   return CATALOG.filter((p) => p.category === category);
 }
 
+/** Lowercased, colon-free, length-capped query safe to round-trip through a
+ *  64-byte callback_data payload. */
+function packQuery(q: string): string {
+  return q.toLowerCase().replace(/:/g, " ").trim().slice(0, 40);
+}
+
+/** Rank matches: name/id starts-with first, then substring, then alphabetical. */
+function searchCatalog(query: string): Provider[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+  const scored = CATALOG
+    .map((p) => {
+      const name = p.name.toLowerCase();
+      let score = -1;
+      if (name === q || p.id === q) score = 3;
+      else if (name.startsWith(q) || p.id.startsWith(q)) score = 2;
+      else if (name.includes(q) || p.id.includes(q)) score = 1;
+      return { p, score };
+    })
+    .filter((x) => x.score > 0)
+    .sort((a, b) => b.score - a.score || a.p.name.localeCompare(b.p.name));
+  return scored.slice(0, SEARCH_LIMIT).map((x) => x.p);
+}
+
 // ---------- Keyboards ----------
+
+function tile(on: boolean): string {
+  return on ? "✅" : "➕";
+}
+
+/** Search-first home: popular individual quick-adds, then browse / done. */
+function welcomeKeyboard(watch: Set<string>): InlineKeyboard {
+  const rows: InlineButton[][] = [];
+  let row: InlineButton[] = [];
+  for (const id of POPULAR_IDS) {
+    const p = CATALOG.find((x) => x.id === id);
+    if (!p) continue;
+    row.push({ text: `${tile(watch.has(id))} ${p.name}`, callback_data: `qa:${id}` });
+    if (row.length === 2) { rows.push(row); row = []; }
+  }
+  if (row.length) rows.push(row);
+  rows.push([{ text: "🔎 Browse all by category", callback_data: "cats" }]);
+  const last: InlineButton[] = [{ text: "✓ Done", callback_data: "done" }];
+  if (watch.size) last.unshift({ text: "🧹 Clear", callback_data: "clr" });
+  rows.push(last);
+  return { inline_keyboard: rows };
+}
 
 function categoriesKeyboard(watch: Set<string>): InlineKeyboard {
   const rows = CATEGORY_ORDER.map((cat, i) => {
@@ -49,32 +99,35 @@ function categoriesKeyboard(watch: Set<string>): InlineKeyboard {
     const label = `${CAT_EMOJI[cat] ?? "•"} ${cat}${n ? `  ·  ${n}` : ""}`;
     return [{ text: label, callback_data: `cat:${i}` }];
   });
-  rows.push([
-    { text: "⚡ Add essentials", callback_data: "ess" },
-    { text: "🗑 Clear", callback_data: "clr" },
-  ]);
-  rows.push([{ text: "✓ Done", callback_data: "done" }]);
+  rows.push([{ text: "‹ Back", callback_data: "welcome" }]);
   return { inline_keyboard: rows };
 }
 
 function categoryKeyboard(catIndex: number, watch: Set<string>): InlineKeyboard {
   const cat = CATEGORY_ORDER[catIndex] ?? "";
-  const rows: InlineKeyboard["inline_keyboard"] = [];
-  let row: InlineKeyboard["inline_keyboard"][number] = [];
+  const rows: InlineButton[][] = [];
+  let row: InlineButton[] = [];
   for (const p of providersIn(cat)) {
-    const on = watch.has(p.id);
-    row.push({ text: `${on ? "✅" : "⬜"} ${p.name}`, callback_data: `tog:${p.id}:${catIndex}` });
-    if (row.length === 2) {
-      rows.push(row);
-      row = [];
-    }
+    row.push({ text: `${tile(watch.has(p.id))} ${p.name}`, callback_data: `tog:${p.id}:${catIndex}` });
+    if (row.length === 2) { rows.push(row); row = []; }
   }
   if (row.length) rows.push(row);
   rows.push([
     { text: "Select all", callback_data: `sall:${catIndex}` },
     { text: "Clear", callback_data: `scl:${catIndex}` },
   ]);
-  rows.push([{ text: "‹ Categories", callback_data: "home" }]);
+  rows.push([{ text: "‹ Categories", callback_data: "cats" }]);
+  return { inline_keyboard: rows };
+}
+
+function searchKeyboard(matches: Provider[], watch: Set<string>, levels: Map<string, Level>, q: string): InlineKeyboard {
+  const packed = packQuery(q);
+  const rows: InlineButton[][] = matches.map((p) => {
+    const lvl = levels.get(p.id) ?? "unknown";
+    const dot = lvl === "operational" || lvl === "unknown" ? "" : `${EMOJI[lvl]} `;
+    return [{ text: `${tile(watch.has(p.id))} ${dot}${p.name}`, callback_data: `find:${p.id}:${packed}` }];
+  });
+  rows.push([{ text: "🔎 Browse all by category", callback_data: "cats" }]);
   return { inline_keyboard: rows };
 }
 
@@ -82,11 +135,18 @@ function categoryKeyboard(catIndex: number, watch: Set<string>): InlineKeyboard 
 
 function welcomeText(count: number): string {
   return (
-    "🛰  <b>Welcome to Outage Observer</b>\n\n" +
-    "Pick the services you actually depend on, and I'll ping you the moment one of them has trouble. Quiet otherwise.\n\n" +
-    "<i>Tap a category to choose services. Picks save as you go.</i>\n\n" +
+    "🛰  <b>Outage Observer</b>\n\n" +
+    "I'll ping you the moment a service you watch has trouble, and stay quiet otherwise.\n\n" +
+    "<b>Add the services you depend on:</b>\n" +
+    "•  <b>Type a name</b> to search — e.g. <code>stripe</code>\n" +
+    "•  Tap a popular pick below\n" +
+    "•  Or browse the full list by category\n\n" +
     `Watching <b>${count}</b> service${count === 1 ? "" : "s"}.`
   );
+}
+
+function categoriesText(watch: Set<string>): string {
+  return `🔎  <b>Browse by category</b>\n\nTap a category to see its services. Watching <b>${watch.size}</b> so far.`;
 }
 
 function categoryText(catIndex: number, watch: Set<string>): string {
@@ -96,9 +156,21 @@ function categoryText(catIndex: number, watch: Set<string>): string {
   return `${CAT_EMOJI[cat] ?? "•"} <b>${esc(cat)}</b>\n${n} of ${provs.length} selected. Tap to toggle.`;
 }
 
+function searchText(query: string, matches: Provider[]): string {
+  if (!matches.length) {
+    return (
+      `No service matches "<b>${esc(query)}</b>".\n\n` +
+      "Try another name, or tap browse to see everything."
+    );
+  }
+  return (
+    `🔎  Results for "<b>${esc(query)}</b>" — tap to add or remove:`
+  );
+}
+
 function doneText(watch: string[]): string {
   if (!watch.length) {
-    return "You haven't picked any services yet.\n\nTap /stack to choose the ones you depend on.";
+    return "You haven't added any services yet.\n\nType a name to search, or /stack to start again.";
   }
   const names = CATALOG.filter((p) => watch.includes(p.id)).map((p) => esc(p.name));
   return (
@@ -109,18 +181,22 @@ function doneText(watch: string[]): string {
   );
 }
 
+async function levelMap(env: Env): Promise<Map<string, Level>> {
+  const board = await getBoard(env);
+  return new Map((board?.providers ?? []).map((e) => [e.id, e.level] as const));
+}
+
 async function statusText(env: Env, chatId: number): Promise<string> {
   const watch = await getWatch(env, chatId);
   if (!watch.length) {
-    return "You're not watching anything yet.\n\nTap /stack to pick the services you depend on.";
+    return "You're not watching anything yet.\n\nType a service name to search, or /stack to browse.";
   }
   const watchSet = new Set(watch);
-  const board = await getBoard(env);
-  const byId = new Map((board?.providers ?? []).map((e) => [e.id, e]));
+  const levels = await levelMap(env);
   const lines: string[] = [`<b>Your stack</b>  (${watch.length} watched)`];
   for (const p of CATALOG) {
     if (!watchSet.has(p.id)) continue;
-    const lvl = byId.get(p.id)?.level ?? "unknown";
+    const lvl = levels.get(p.id) ?? "unknown";
     lines.push(`${EMOJI[lvl]} ${esc(p.name)}${lvl === "operational" ? "" : `  ${LABEL[lvl]}`}`);
   }
   return lines.join("\n");
@@ -131,7 +207,7 @@ async function applyWatch(env: Env, chatId: number, query: string, add: boolean)
   if (!q) return add ? "Usage: /watch &lt;service&gt;" : "Usage: /unwatch &lt;service&gt;";
   const exact = CATALOG.find((p) => p.id === q || p.name.toLowerCase() === q);
   const p = exact ?? CATALOG.find((x) => x.name.toLowerCase().includes(q) || x.id.includes(q));
-  if (!p) return `No service matches "${esc(query)}". Try /stack to browse.`;
+  if (!p) return `No service matches "${esc(query)}". Type a name to search, or /stack to browse.`;
   const watching = new Set(await getWatch(env, chatId));
   if (add && watching.has(p.id)) return `Already watching ${esc(p.name)}.`;
   if (!add && !watching.has(p.id)) return `You weren't watching ${esc(p.name)}.`;
@@ -152,6 +228,13 @@ export async function onUpdate(env: Env, update: any): Promise<void> {
 async function handleMessage(env: Env, message: any): Promise<void> {
   const chatId: number = message.chat.id;
   const text = String(message.text).trim();
+
+  // Anything that isn't a slash-command is treated as a service search.
+  if (!text.startsWith("/")) {
+    await runSearch(env, chatId, text);
+    return;
+  }
+
   const cmd = (text.split(/\s+/)[0] ?? "").toLowerCase();
   const arg = text.slice(cmd.length).trim();
 
@@ -160,9 +243,13 @@ async function handleMessage(env: Env, message: any): Promise<void> {
     case "/stack": {
       if (cmd === "/start") await addUser(env, chatId);
       const watch = new Set(await getWatch(env, chatId));
-      await sendMessage(env, chatId, welcomeText(watch.size), categoriesKeyboard(watch));
+      await sendMessage(env, chatId, welcomeText(watch.size), welcomeKeyboard(watch));
       break;
     }
+    case "/find":
+    case "/search":
+      await runSearch(env, chatId, arg);
+      break;
     case "/status":
       await sendMessage(env, chatId, await statusText(env, chatId));
       break;
@@ -195,8 +282,29 @@ async function handleMessage(env: Env, message: any): Promise<void> {
       );
       break;
     default:
-      await sendMessage(env, chatId, "Commands:  /stack to choose services  ·  /status  ·  /stop");
+      await sendMessage(
+        env,
+        chatId,
+        "Type a service name to search, or use:  /stack to browse  ·  /status  ·  /stop",
+      );
   }
+}
+
+async function runSearch(env: Env, chatId: number, query: string): Promise<void> {
+  const q = query.trim();
+  if (!q) {
+    const watch = new Set(await getWatch(env, chatId));
+    await sendMessage(env, chatId, welcomeText(watch.size), welcomeKeyboard(watch));
+    return;
+  }
+  const matches = searchCatalog(q);
+  if (!matches.length) {
+    await sendMessage(env, chatId, searchText(q, matches), { inline_keyboard: [[{ text: "🔎 Browse all by category", callback_data: "cats" }]] });
+    return;
+  }
+  const watch = new Set(await getWatch(env, chatId));
+  const levels = await levelMap(env);
+  await sendMessage(env, chatId, searchText(q, matches), searchKeyboard(matches, watch, levels, q));
 }
 
 async function handleCallback(env: Env, cq: any): Promise<void> {
@@ -210,21 +318,40 @@ async function handleCallback(env: Env, cq: any): Promise<void> {
 
   const watch = new Set(await getWatch(env, chatId));
 
-  if (data === "home") {
-    await editMessageText(env, chatId, messageId, welcomeText(watch.size), categoriesKeyboard(watch));
+  if (data === "welcome") {
+    await editMessageText(env, chatId, messageId, welcomeText(watch.size), welcomeKeyboard(watch));
+    await answerCallback(env, cq.id);
+  } else if (data === "cats") {
+    await editMessageText(env, chatId, messageId, categoriesText(watch), categoriesKeyboard(watch));
     await answerCallback(env, cq.id);
   } else if (data === "done") {
     await editMessageText(env, chatId, messageId, doneText([...watch]));
     await answerCallback(env, cq.id, watch.size ? "Saved" : undefined);
-  } else if (data === "ess") {
-    await setStack(env, chatId, [...watch, ...PRIORITY_IDS]);
-    const next = new Set(await getWatch(env, chatId));
-    await editMessageText(env, chatId, messageId, welcomeText(next.size), categoriesKeyboard(next));
-    await answerCallback(env, cq.id, "Added the essentials");
   } else if (data === "clr") {
     await clearWatch(env, chatId);
-    await editMessageText(env, chatId, messageId, welcomeText(0), categoriesKeyboard(new Set()));
+    await editMessageText(env, chatId, messageId, welcomeText(0), welcomeKeyboard(new Set()));
     await answerCallback(env, cq.id, "Cleared");
+  } else if (data.startsWith("qa:")) {
+    // Popular quick-add from the home screen — toggle, re-render home.
+    const pid = data.slice(3);
+    const nowOn = await toggleWatch(env, chatId, pid);
+    const next = new Set(await getWatch(env, chatId));
+    await editMessageText(env, chatId, messageId, welcomeText(next.size), welcomeKeyboard(next));
+    const prov = CATALOG.find((p) => p.id === pid);
+    await answerCallback(env, cq.id, prov ? `${nowOn ? "Added" : "Removed"} ${prov.name}` : undefined);
+  } else if (data.startsWith("find:")) {
+    // Toggle from a search-results message — re-render the same results in place.
+    const rest = data.slice("find:".length);
+    const idx = rest.indexOf(":");
+    const pid = idx >= 0 ? rest.slice(0, idx) : rest;
+    const q = idx >= 0 ? rest.slice(idx + 1) : "";
+    const nowOn = await toggleWatch(env, chatId, pid);
+    const next = new Set(await getWatch(env, chatId));
+    const matches = searchCatalog(q);
+    const levels = await levelMap(env);
+    await editMessageText(env, chatId, messageId, searchText(q, matches), searchKeyboard(matches, next, levels, q));
+    const prov = CATALOG.find((p) => p.id === pid);
+    await answerCallback(env, cq.id, prov ? `${nowOn ? "Added" : "Removed"} ${prov.name}` : undefined);
   } else if (data.startsWith("cat:")) {
     const i = Number(data.slice(4));
     await editMessageText(env, chatId, messageId, categoryText(i, watch), categoryKeyboard(i, watch));

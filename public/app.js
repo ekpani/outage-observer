@@ -20,12 +20,10 @@ const PHRASE = {
 };
 const SEV = { operational: 0, maintenance: 1, degraded: 2, partial_outage: 3, major_outage: 4, unknown: -1 };
 
-// The 16 most-depended providers (mirrors PRIORITY_IDS in the Worker). The
-// onboarding "essentials" shortcut seeds these.
-const ESSENTIALS = [
-  "aws", "gcp", "azure", "cloudflare", "vercel", "netlify", "github", "npm",
-  "openai", "anthropic", "stripe", "slack", "discord", "twilio", "supabase", "mongodb",
-];
+// A few commonly-watched services offered as INDIVIDUAL quick-adds to break the
+// blank page (tap one at a time). Mirrors POPULAR_IDS in the Worker. Not a bulk
+// "add all" and not a blessed "essentials" set — we don't decide what you need.
+const POPULAR = ["cloudflare", "aws", "github", "vercel", "openai", "anthropic", "stripe", "slack"];
 
 // Glyph set from the design system (16x16, currentColor inherits the status fg).
 const GLYPHS = {
@@ -38,6 +36,7 @@ const GLYPHS = {
 };
 const STAR = '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 1.7l1.8 3.9 4.2.4-3.1 2.9.9 4.2L8 11.9 4.2 13.9l.9-4.2L2 6.8l4.2-.4z" fill="currentColor"/></svg>';
 const PLUS = '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 3 V13 M3 8 H13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+const X = '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M4.5 4.5 L11.5 11.5 M11.5 4.5 L4.5 11.5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>';
 const ARROW = '<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M3 8 H12 M8.5 4.5 L12 8 L8.5 11.5" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
 // Provider id -> Simple Icons slug, only where they differ. Everything else
@@ -84,12 +83,17 @@ function logoTile(p) {
   return `<span class="logo">${esc(initial)}<img src="https://cdn.simpleicons.org/${esc(slug)}/9aa0a6" alt="" loading="lazy" onerror="this.remove()"></span>`;
 }
 
-function rowHtml(p, stack) {
+function rowHtml(p, stack, mode) {
   const pinned = stack.has(p.id);
   const incident = p.incident && p.incident.name
     ? `<span class="incident" title="${esc(p.incident.name)}">${esc(p.incident.name)}</span>`
     : '<span class="incident"></span>';
   const href = p.home ? esc(p.home) : "#";
+  // On the board, every row is yours, so the control is an explicit Remove (×).
+  // In the picker it's an add / added toggle.
+  const control = mode === "board"
+    ? `<button class="pin remove" data-id="${esc(p.id)}" aria-label="Remove ${esc(p.name)} from your board" title="Remove from board">${X}</button>`
+    : `<button class="pin ${pinned ? "pinned" : ""}" data-id="${esc(p.id)}" aria-pressed="${pinned}" aria-label="${pinned ? "Remove from" : "Add to"} board" title="${pinned ? "Remove from" : "Add to"} board">${pinned ? STAR : PLUS}</button>`;
   return `<div class="row ${pinned ? "added" : ""}" data-name="${esc(p.name.toLowerCase())}">`
     + `<a class="row-main" href="${href}" target="_blank" rel="noopener noreferrer">`
     + logoTile(p)
@@ -97,7 +101,7 @@ function rowHtml(p, stack) {
     + badge(p.level)
     + incident
     + `</a>`
-    + `<button class="pin ${pinned ? "pinned" : ""}" data-id="${esc(p.id)}" aria-pressed="${pinned}" aria-label="${pinned ? "Remove from" : "Add to"} My Stack" title="${pinned ? "Remove from" : "Add to"} My Stack">${pinned ? STAR : PLUS}</button>`
+    + control
     + `</div>`;
 }
 
@@ -143,7 +147,7 @@ function boardHtml(providers, stack, checked) {
 
   let html = scopedSummary(tracked, checked);
   html += `<div class="cat mystack"><span class="star">${STAR}</span><span class="label">My Stack</span><span class="count mono">${tracked.length}</span><span class="rule"></span></div>`;
-  html += tracked.map((p) => rowHtml(p, stack)).join("");
+  html += tracked.map((p) => rowHtml(p, stack, "board")).join("");
 
   const elsewhere = providers.filter((p) => !stack.has(p.id) && needsAttention(p)).length;
   const note = elsewhere
@@ -161,17 +165,19 @@ function browseHtml(providers, stack, checked) {
   let head = '<div class="pick-head">';
   if (onboarding) {
     head += '<div class="ph-title">Build your board</div>'
-      + '<div class="ph-sub">Pick the services your product depends on. Outage Observer watches just those and surfaces trouble the moment it shows. Everything else stays out of your way.</div>'
-      + '<div class="ph-actions">'
-      + `<button class="btn btn-primary" data-act="essentials">⚡ Add the essentials</button>`
-      + '<span class="ph-stat mono">16 most-depended services</span>'
-      + '</div>';
+      + '<div class="ph-sub">Search for the services your product depends on, or tap a popular one to start. Outage Observer watches just those and stays quiet about the rest.</div>';
   } else {
     head += '<div class="ph-title">Add services</div>'
-      + '<div class="ph-sub">Star anything you want on your board. Your picks stay on this device.</div>'
+      + '<div class="ph-sub">Search by name, or tap to add. Your picks stay on this device.</div>'
       + '<div class="ph-actions">'
       + `<button class="btn btn-primary" data-act="board">View my board (${stack.size}) ${ARROW}</button>`
-      + `<button class="btn" data-act="essentials">⚡ Essentials</button>`
+      + '</div>';
+  }
+  // Individual popular quick-adds (only the ones not already on your board).
+  const pop = POPULAR.map((id) => providers.find((p) => p.id === id)).filter((p) => p && !stack.has(p.id));
+  if (pop.length) {
+    head += '<div class="popular"><span class="pl-label mono">Popular</span>'
+      + pop.map((p) => `<button class="qa-chip" data-add="${esc(p.id)}" title="Add ${esc(p.name)}">${PLUS}<span>${esc(p.name)}</span></button>`).join("")
       + '</div>';
   }
   head += '</div>';
@@ -190,7 +196,7 @@ function browseHtml(providers, stack, checked) {
     const picked = inCat.filter((p) => stack.has(p.id)).length;
     html += `<div class="cat"><span class="label">${esc(cat)}</span>`
       + `<span class="count mono">${picked ? picked + "/" : ""}${inCat.length}</span><span class="rule"></span></div>`;
-    html += inCat.map((p) => rowHtml(p, stack)).join("");
+    html += inCat.map((p) => rowHtml(p, stack, "browse")).join("");
   }
   return html;
 }
@@ -239,6 +245,8 @@ function setView(v) { VIEW = v; render(); }
 
 function applyFilter() {
   const q = (document.getElementById("filter").value || "").trim().toLowerCase();
+  // While searching, collapse category/section chrome to a flat result list.
+  document.body.dataset.searching = q ? "1" : "0";
   document.querySelectorAll(".row").forEach((r) => {
     r.style.display = !q || (r.dataset.name || "").includes(q) ? "" : "none";
   });
@@ -257,12 +265,14 @@ document.addEventListener("click", (e) => {
     const a = act.dataset.act;
     if (a === "browse") return setView("browse");
     if (a === "board") return setView("board");
-    if (a === "essentials") {
-      const stack = getStack();
-      ESSENTIALS.forEach((id) => stack.add(id));
-      saveStack(stack);
-      return setView("board");
-    }
+  }
+  const addBtn = e.target.closest("[data-add]");
+  if (addBtn) {
+    const stack = getStack();
+    stack.add(addBtn.dataset.add);
+    saveStack(stack);
+    render();           // stay in the picker so you can add several
+    return;
   }
   const pin = e.target.closest(".pin");
   if (pin) {

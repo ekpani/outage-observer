@@ -94,7 +94,7 @@ body {
   font-family: var(--oo-font-mono); font-size: var(--oo-text-sm);
   background: var(--oo-bg-sunken); color: var(--oo-text-primary);
   border: 1px solid var(--oo-border); border-radius: var(--oo-radius-md);
-  padding: 5px 9px; width: 116px; outline: none;
+  padding: 5px 9px; width: 168px; outline: none;
 }
 .filter::placeholder { color: var(--oo-text-muted); }
 .filter:focus-visible { box-shadow: 0 0 0 3px var(--oo-focus-ring); border-color: var(--oo-accent); }
@@ -152,6 +152,30 @@ body {
 }
 .btn-primary:hover { color: var(--oo-accent); background: color-mix(in srgb, var(--oo-accent) 20%, transparent); }
 .btn-primary .glyph, .btn svg { flex: none; }
+
+/* Individual popular quick-adds (tap one at a time, no bulk add). */
+.popular { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 16px; }
+.popular .pl-label { font-size: 11px; color: var(--oo-text-muted); text-transform: uppercase; letter-spacing: .12em; margin-right: 2px; }
+.qa-chip {
+  display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+  padding: 6px 11px 6px 9px; border-radius: var(--oo-radius-full);
+  border: 1px solid var(--oo-border-strong); background: var(--oo-bg-elevated);
+  color: var(--oo-text-secondary); font-family: var(--oo-font-mono);
+  font-size: 12.5px; letter-spacing: var(--oo-tracking-mono);
+}
+.qa-chip:hover { color: var(--oo-accent); border-color: var(--oo-accent); }
+.qa-chip svg { flex: none; opacity: .8; }
+.qa-chip:focus-visible { box-shadow: 0 0 0 3px var(--oo-focus-ring); outline: none; }
+
+/* Explicit Remove (×) on board rows — obvious, turns danger-red on hover. */
+.row .pin.remove { color: var(--oo-text-muted); }
+.row .pin.remove:hover { color: var(--oo-status-major_outage-fg); background: var(--oo-status-major_outage-tint); }
+
+/* While searching, hide section chrome so results read as one flat list. */
+body[data-searching="1"] .cat,
+body[data-searching="1"] .popular,
+body[data-searching="1"] .browse-stat,
+body[data-searching="1"] .browse-cta { display: none; }
 
 /* Global health strip atop the browse list (awareness without alarm). */
 .browse-stat { display: flex; align-items: center; gap: 8px; padding: 12px 22px; font-size: 12px; color: var(--oo-text-muted); border-bottom: 1px solid var(--oo-border); background: var(--oo-bg-sunken); }
