@@ -21,23 +21,25 @@ body {
    only shows in the margins around it. Tied to the operational green, very faint,
    and frozen by the global prefers-reduced-motion rule in tokens.css. ---- */
 .radar {
-  --radar-line: color-mix(in srgb, var(--oo-status-operational-fg) 7%, transparent);
+  --radar-line: color-mix(in srgb, var(--oo-status-operational-fg) 8%, transparent);
   --radar-sweep: color-mix(in srgb, var(--oo-status-operational-fg) 16%, transparent);
+  --radar-pupil: color-mix(in srgb, var(--oo-status-operational-fg) 26%, transparent);
   position: fixed;
-  top: 50%;
-  left: 50%;
-  width: 134vmax;
-  height: 134vmax;
+  /* Origin in the lower-right, like the OG card, so the scope reads as a beacon
+     beside the board instead of hiding behind its center. */
+  top: 76%;
+  left: 85%;
+  width: 116vmax;
+  height: 116vmax;
   transform: translate(-50%, -50%);
   z-index: -1;
   pointer-events: none;
   border-radius: 50%;
   background:
-    linear-gradient(var(--radar-line), var(--radar-line)) center / 1px 100% no-repeat,
-    linear-gradient(var(--radar-line), var(--radar-line)) center / 100% 1px no-repeat,
-    repeating-radial-gradient(circle at center, var(--radar-line) 0 1px, transparent 1px 6vmax);
-  -webkit-mask: radial-gradient(circle at center, #000 0%, #000 24%, transparent 64%);
-  mask: radial-gradient(circle at center, #000 0%, #000 24%, transparent 64%);
+    radial-gradient(circle at center, var(--radar-pupil) 0, transparent 2.2vmax),
+    repeating-radial-gradient(circle at center, var(--radar-line) 0 1px, transparent 1px 5vmax);
+  -webkit-mask: radial-gradient(circle at center, #000 0%, #000 4%, transparent 56%);
+  mask: radial-gradient(circle at center, #000 0%, #000 4%, transparent 56%);
 }
 .radar-sweep {
   position: absolute;
@@ -182,4 +184,13 @@ body {
   .row .name { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .row .incident { display: none; }
   .row .pin { margin-right: 8px; }
+  /* The board fills the screen on mobile, so the bottom-right beacon only peeks
+     at the corner: boost intensity + visible radius so it still reads. */
+  .radar {
+    --radar-line: color-mix(in srgb, var(--oo-status-operational-fg) 13%, transparent);
+    --radar-sweep: color-mix(in srgb, var(--oo-status-operational-fg) 30%, transparent);
+    --radar-pupil: color-mix(in srgb, var(--oo-status-operational-fg) 40%, transparent);
+    -webkit-mask: radial-gradient(circle at center, #000 0%, #000 5%, transparent 66%);
+    mask: radial-gradient(circle at center, #000 0%, #000 5%, transparent 66%);
+  }
 }
