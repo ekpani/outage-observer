@@ -1,13 +1,14 @@
 import type { Incident, Level, ProviderStatus } from "./types";
 
-const INDICATOR_TO_LEVEL: Record<string, Level> = {
-  none: "operational",
-  minor: "degraded",
-  major: "partial_outage",
-  critical: "major_outage",
-};
-
-/** Atlassian Statuspage: GET {base}/api/v2/summary.json */
+/** Atlassian Statuspage: GET {base}/api/v2/summary.json
+ *
+ *  Note on "minor": Statuspage rolls per-component statuses up into the overall
+ *  indicator, so providers with many granular components sit at "minor" almost
+ *  permanently. Cloudflare is the worst case: ~330 edge locations, routinely a
+ *  few under maintenance, which rolls up to "minor" with dozens of degraded
+ *  components but no real incident. So we only treat "minor" as degraded when
+ *  there is an actual open incident; otherwise it's routine noise → operational.
+ *  major / critical always reflect through, since those are real. */
 export async function fetchStatuspage(base: string): Promise<ProviderStatus> {
   const res = await fetch(`${base}/api/v2/summary.json`, {
     headers: { "user-agent": "OutageObserver/0.1 (+https://outage.observer)" },
@@ -19,15 +20,24 @@ export async function fetchStatuspage(base: string): Promise<ProviderStatus> {
 
   const data = await res.json<any>();
   const indicator: string = data?.status?.indicator ?? "none";
+  const openIncidents: any[] = Array.isArray(data?.incidents) ? data.incidents : [];
   const inMaintenance = (data?.scheduled_maintenances ?? []).some(
     (m: any) => m?.status === "in_progress",
   );
-  const level: Level =
-    inMaintenance && indicator === "none"
-      ? "maintenance"
-      : INDICATOR_TO_LEVEL[indicator] ?? "unknown";
 
-  const incidents: Incident[] = (data?.incidents ?? []).map((i: any) => ({
+  let level: Level;
+  if (indicator === "minor") {
+    level = openIncidents.length > 0 ? "degraded" : inMaintenance ? "maintenance" : "operational";
+  } else if (indicator === "major") {
+    level = "partial_outage";
+  } else if (indicator === "critical") {
+    level = "major_outage";
+  } else {
+    // "none" (or anything unrecognized) is operational, unless mid-maintenance.
+    level = inMaintenance ? "maintenance" : "operational";
+  }
+
+  const incidents: Incident[] = openIncidents.map((i: any) => ({
     name: String(i?.name ?? "Incident"),
     impact: String(i?.impact ?? "none"),
     status: String(i?.status ?? "investigating"),
