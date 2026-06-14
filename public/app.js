@@ -24,6 +24,15 @@ const GLYPHS = {
 };
 const STAR = '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 1.7l1.8 3.9 4.2.4-3.1 2.9.9 4.2L8 11.9 4.2 13.9l.9-4.2L2 6.8l4.2-.4z" fill="currentColor"/></svg>';
 
+// Provider id -> Simple Icons slug, only where they differ. Everything else
+// uses the id as-is; a missing icon 404s and app.js drops the <img> (onerror),
+// leaving the monogram fallback.
+const SLUGS = {
+  gcp: "googlecloud", aws: "amazonwebservices", azure: "microsoftazure",
+  fly: "flydotio", travis: "travisci", cockroach: "cockroachlabs",
+  onepassword: "1password", monday: "mondaydotcom", getstream: "stream",
+};
+
 const STACK_KEY = "oo-stack";
 const THEME_KEY = "oo-theme";
 
@@ -55,9 +64,10 @@ function rowHtml(p, stack) {
     ? `<span class="incident" title="${esc(p.incident.name)}">${esc(p.incident.name)}</span>`
     : '<span class="incident"></span>';
   const href = p.home ? esc(p.home) : "#";
+  const slug = SLUGS[p.id] || p.id;
   return `<div class="row" data-name="${esc(p.name.toLowerCase())}">`
     + `<a class="row-main" href="${href}" target="_blank" rel="noopener noreferrer">`
-    + `<span class="logo">${esc(initial)}</span>`
+    + `<span class="logo">${esc(initial)}<img src="https://cdn.simpleicons.org/${esc(slug)}/9aa0a6" alt="" loading="lazy" onerror="this.remove()"></span>`
     + `<span class="name">${esc(p.name)}</span>`
     + badge(p.level)
     + incident
