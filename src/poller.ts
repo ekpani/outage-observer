@@ -1,25 +1,8 @@
 import { CATALOG } from "./catalog";
 import { fetchStatus, SEVERITY, type Level, type ProviderStatus } from "./adapters";
-import { getLastLevel, setLastLevel, getSubscribers } from "./store";
+import { getAllLevels, setAllLevels, getSubscribers } from "./store";
 import { sendMessage, type Env } from "./telegram";
-
-const EMOJI: Record<Level, string> = {
-  operational: "🟢",
-  maintenance: "🔧",
-  degraded: "🟡",
-  partial_outage: "🟠",
-  major_outage: "🔴",
-  unknown: "⚪️",
-};
-
-const LABEL: Record<Level, string> = {
-  operational: "Operational",
-  maintenance: "Maintenance",
-  degraded: "Degraded",
-  partial_outage: "Partial outage",
-  major_outage: "Major outage",
-  unknown: "Unknown",
-};
+import { EMOJI, LABEL } from "./labels";
 
 interface Transition {
   name: string;
@@ -38,7 +21,10 @@ export async function pollAll(env: Env): Promise<number> {
     })),
   );
 
+  // One KV read for all providers; write back only if something changed.
+  const levels = await getAllLevels(env);
   const transitions: Transition[] = [];
+  let changed = false;
 
   for (const result of results) {
     if (result.status !== "fulfilled") continue;
@@ -46,13 +32,16 @@ export async function pollAll(env: Env): Promise<number> {
     // Never alert on (or persist) a failed fetch; keep the last good level.
     if (status.level === "unknown") continue;
 
-    const prev = await getLastLevel(env, provider.id);
-    if (prev && prev !== status.level) {
+    const prev = levels[provider.id];
+    if (prev === status.level) continue;
+    if (prev) {
       transitions.push({ name: provider.name, from: prev, to: status.level, status });
     }
-    await setLastLevel(env, provider.id, status.level);
+    levels[provider.id] = status.level;
+    changed = true;
   }
 
+  if (changed) await setAllLevels(env, levels);
   if (transitions.length === 0) return 0;
 
   const subscribers = await getSubscribers(env);

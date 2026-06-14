@@ -1,15 +1,22 @@
 import type { Env } from "./telegram";
 import type { Level } from "./adapters";
 
-const levelKey = (id: string) => `status:${id}`;
+const LEVELS_KEY = "levels";
 const SUBS_KEY = "subscribers";
 
-export async function getLastLevel(env: Env, id: string): Promise<Level | null> {
-  return (await env.STATUS_KV.get(levelKey(id))) as Level | null;
+/** Map of provider id -> last seen level, stored under a single KV key so a
+ *  poll costs one read and at most one write, regardless of catalog size.
+ *  (Per-provider writes every minute would blow past KV's 1,000 writes/day
+ *  free limit; here we only write when something actually changes.) */
+export type LevelMap = Record<string, Level>;
+
+export async function getAllLevels(env: Env): Promise<LevelMap> {
+  const raw = await env.STATUS_KV.get(LEVELS_KEY);
+  return raw ? (JSON.parse(raw) as LevelMap) : {};
 }
 
-export async function setLastLevel(env: Env, id: string, level: Level): Promise<void> {
-  await env.STATUS_KV.put(levelKey(id), level);
+export async function setAllLevels(env: Env, levels: LevelMap): Promise<void> {
+  await env.STATUS_KV.put(LEVELS_KEY, JSON.stringify(levels));
 }
 
 export async function getSubscribers(env: Env): Promise<number[]> {
