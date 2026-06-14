@@ -5,6 +5,10 @@
   "compatibility_date": "2026-06-14",
   "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true, "head_sampling_rate": 1 },
+  // Static board (index.html, tokens.css, board.css, app.js, favicon.svg).
+  // Assets are served first; non-asset paths (/api/status, /webhook, /debug/*)
+  // fall through to the Worker below.
+  "assets": { "directory": "./public" },
   // Polls every minute. Status is global, so each source is fetched once
   // per tick regardless of how many subscribers there are.
   "triggers": {

@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Outage Observer — live status of your stack</title>
+  <meta name="description" content="A fast, no-login status board for the infra and AI providers in your stack. One page, all your services, live." />
+  <meta property="og:title" content="Outage Observer" />
+  <meta property="og:description" content="Live status of the infra and AI providers in your stack, in one place." />
+  <meta property="og:type" content="website" />
+  <meta name="theme-color" content="#FBFBFA" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#070809" media="(prefers-color-scheme: dark)" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/tokens.css" />
+  <link rel="stylesheet" href="/board.css" />
+  <script>
+    // Apply a pinned theme before first paint to avoid a flash.
+    (function () { try { var t = localStorage.getItem("oo-theme"); if (t) document.documentElement.setAttribute("data-theme", t); } catch (e) {} })();
+  </script>
+</head>
+<body>
+  <main class="wrap">
+    <div class="board">
+      <header class="board-header">
+        <div class="brand">
+          <svg class="aperture" viewBox="0 0 64 64" width="24" height="24" fill="none" role="img" aria-label="Outage Observer">
+            <circle cx="32" cy="32" r="25" stroke="currentColor" stroke-width="3" />
+            <circle cx="32" cy="32" r="14" stroke="currentColor" stroke-width="3" opacity=".4" />
+            <line x1="32" y1="3" x2="32" y2="9" stroke="currentColor" stroke-width="3" />
+            <line x1="32" y1="55" x2="32" y2="61" stroke="currentColor" stroke-width="3" />
+            <line x1="3" y1="32" x2="9" y2="32" stroke="currentColor" stroke-width="3" />
+            <line x1="55" y1="32" x2="61" y2="32" stroke="currentColor" stroke-width="3" />
+            <circle class="pupil" cx="32" cy="32" r="6" fill="#3FCF5E" />
+          </svg>
+          <span class="wordmark">outage<span class="dot">.</span>observer</span>
+        </div>
+        <div class="spacer"></div>
+        <input id="filter" class="filter" type="search" placeholder="filter…" aria-label="Filter services" autocomplete="off" />
+        <span id="updated" class="updated"></span>
+        <button id="theme" class="icon-btn" aria-label="Toggle light/dark theme" title="Toggle theme">
+          <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+            <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5" />
+            <path d="M8 2 a6 6 0 0 1 0 12 Z" fill="currentColor" />
+          </svg>
+        </button>
+      </header>
+      <div id="board-body"></div>
+    </div>
+    <footer class="page-foot mono">
+      outage.observer · polled every minute · <a href="https://t.me/outageobserverbot">@outageobserverbot</a>
+    </footer>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>

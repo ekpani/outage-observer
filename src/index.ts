@@ -17,10 +17,6 @@ export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
-    if (url.pathname === "/") {
-      return new Response("outage-observer: ok");
-    }
-
     // Public board snapshot. Edge-cached so a traffic spike (an outage is
     // exactly when everyone shows up) doesn't hammer KV. The cron refreshes
     // the underlying board; clients see at most ~30s of staleness.

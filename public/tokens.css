@@ -1,0 +1,154 @@
+/* ============================================================================
+   Outage Observer — Design Tokens
+   ----------------------------------------------------------------------------
+   Consume these directly. No build step required.
+
+   Theme model:
+     • :root            → LIGHT theme (default)
+     • [data-theme=dark]→ explicit dark (overrides system)
+     • @media dark      → auto-dark when the user hasn't chosen, unless
+                          [data-theme=light] is set on <html>.
+
+   Set <html data-theme="dark"> / "light" to pin a theme; omit to follow the OS.
+
+   Namespace: --oo-*   (mapping note: "fg"=foreground/text+dot, "tint"=subtle
+   badge/accent wash, both AA-safe on their paired surface.)
+   ========================================================================== */
+
+:root {
+  /* ---- Brand accent (intentionally shares the "operational" hue: the brand
+         IS "up". Used for links, focus, primary actions — never to encode a
+         service's status, which is always carried by the status tokens.) ---- */
+  --oo-accent:            #1A7F37;
+  --oo-accent-hover:      #15692D;
+  --oo-accent-fg:         #FFFFFF;   /* text/icon on an accent fill */
+  --oo-focus-ring:        rgba(26,127,55,.45);
+
+  /* ---- Surfaces ---- */
+  --oo-bg-page:           #FBFBFA;   /* viewport background        */
+  --oo-bg-surface:        #FFFFFF;   /* cards, rows, panels        */
+  --oo-bg-elevated:       #FFFFFF;   /* popovers/menus (+ shadow)  */
+  --oo-bg-sunken:         #F4F4F3;   /* wells, code, track         */
+
+  /* ---- Text ---- */
+  --oo-text-primary:      #16181B;
+  --oo-text-secondary:    #5B636E;
+  --oo-text-muted:        #8A929C;
+  --oo-text-onstatus:     #16181B;   /* text sitting on a status tint */
+
+  /* ---- Lines ---- */
+  --oo-border:            #E6E7E9;
+  --oo-border-strong:     #D5D7DA;
+  --oo-border-width:      1px;
+
+  /* ---- Status — six states, low → high severity ----------------------------
+     Each: -fg (dot + badge text + accent line) and -tint (badge/card wash).
+     Pair every status with its GLYPH (shape, not color) so it is never
+     color-encoded alone. Glyph names below are stable contract. ------------ */
+  --oo-status-operational-fg:     #1A7F37;  --oo-status-operational-tint:   #E7F4EC;  /* glyph: disc    ● */
+  --oo-status-maintenance-fg:     #1F6FEB;  --oo-status-maintenance-tint:   #E6EEFD;  /* glyph: diamond ◆ */
+  --oo-status-degraded-fg:        #946400;  --oo-status-degraded-tint:      #FBF0D9;  /* glyph: bar     ▬ */
+  --oo-status-partial_outage-fg:  #B14A00;  --oo-status-partial_outage-tint:#FCE9D8;  /* glyph: half    ◑ */
+  --oo-status-major_outage-fg:    #C0362C;  --oo-status-major_outage-tint:  #FBE5E2;  /* glyph: cross   ✕ */
+  --oo-status-unknown-fg:         #5B636E;  --oo-status-unknown-tint:       #EDEEEF;  /* glyph: ring    ○ */
+
+  /* ---- Typography -----------------------------------------------------------
+     Perf-first: system stacks, zero font files, no FOUT. To brand the UI later,
+     self-host ONE variable subset and override --oo-font-sans / -mono only. --- */
+  --oo-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "Helvetica Neue", sans-serif;
+  --oo-font-mono: ui-monospace, "SF Mono", "SFMono-Regular", "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace;
+
+  --oo-text-xs:    11px;   /* meta, ticks            */
+  --oo-text-sm:    12px;   /* badges, timestamps     */
+  --oo-text-base:  13px;   /* dense board body       */
+  --oo-text-md:    14px;   /* service names, UI body */
+  --oo-text-lg:    16px;
+  --oo-text-xl:    20px;
+  --oo-text-2xl:   26px;   /* summary banner         */
+  --oo-text-3xl:   34px;
+  --oo-text-4xl:   48px;   /* marketing only         */
+
+  --oo-weight-regular: 400;
+  --oo-weight-medium:  500;
+  --oo-weight-semibold:600;
+  --oo-leading-tight:  1.2;
+  --oo-leading-normal: 1.5;
+  --oo-tracking-tight: -0.01em;
+  --oo-tracking-mono:   0.02em;   /* mono breathes slightly wider */
+
+  /* ---- Spacing (4px base) ---- */
+  --oo-space-1: 4px;   --oo-space-2: 8px;   --oo-space-3: 12px;  --oo-space-4: 16px;
+  --oo-space-5: 20px;  --oo-space-6: 24px;  --oo-space-8: 32px;  --oo-space-12: 48px;
+  --oo-space-16: 64px;
+
+  /* ---- Radii ---- */
+  --oo-radius-sm:   4px;
+  --oo-radius-md:   6px;
+  --oo-radius-lg:   8px;
+  --oo-radius-xl:  12px;
+  --oo-radius-full: 999px;
+
+  /* ---- Elevation (light: real soft shadows) ---- */
+  --oo-shadow-sm: 0 1px 2px rgba(16,18,21,.06), 0 1px 3px rgba(16,18,21,.04);
+  --oo-shadow-md: 0 4px 12px rgba(16,18,21,.08), 0 2px 4px rgba(16,18,21,.05);
+
+  --oo-glow-operational: none;  /* glows only switch on in dark */
+  color-scheme: light;
+}
+
+/* ===========================  DARK  ======================================= */
+:root[data-theme="dark"] {
+  --oo-accent:            #3FCF5E;
+  --oo-accent-hover:      #55D971;
+  --oo-accent-fg:         #07140B;
+  --oo-focus-ring:        rgba(63,207,94,.45);
+
+  --oo-bg-page:           #070809;
+  --oo-bg-surface:        #0C0E11;
+  --oo-bg-elevated:       #15181C;
+  --oo-bg-sunken:         #050607;
+
+  --oo-text-primary:      #ECEEF0;
+  --oo-text-secondary:    #9AA0A6;
+  --oo-text-muted:        #5C636B;
+  --oo-text-onstatus:     #ECEEF0;
+
+  --oo-border:            #1E2329;
+  --oo-border-strong:     #2A3036;
+
+  --oo-status-operational-fg:     #3FCF5E;  --oo-status-operational-tint:   rgba(63,207,94,.13);
+  --oo-status-maintenance-fg:     #5BA8FF;  --oo-status-maintenance-tint:   rgba(91,168,255,.13);
+  --oo-status-degraded-fg:        #E5B647;  --oo-status-degraded-tint:      rgba(229,182,71,.13);
+  --oo-status-partial_outage-fg:  #F0883E;  --oo-status-partial_outage-tint:rgba(240,136,62,.13);
+  --oo-status-major_outage-fg:    #F0726A;  --oo-status-major_outage-tint:  rgba(240,114,106,.13);
+  --oo-status-unknown-fg:         #8A93A0;  --oo-status-unknown-tint:       rgba(138,147,160,.13);
+
+  --oo-shadow-sm: 0 1px 2px rgba(0,0,0,.5);
+  --oo-shadow-md: 0 8px 28px rgba(0,0,0,.55);
+  --oo-glow-operational: 0 0 8px rgba(63,207,94,.55);
+  color-scheme: dark;
+}
+
+/* Auto-dark when the user hasn't pinned a theme */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --oo-accent:#3FCF5E; --oo-accent-hover:#55D971; --oo-accent-fg:#07140B; --oo-focus-ring:rgba(63,207,94,.45);
+    --oo-bg-page:#070809; --oo-bg-surface:#0C0E11; --oo-bg-elevated:#15181C; --oo-bg-sunken:#050607;
+    --oo-text-primary:#ECEEF0; --oo-text-secondary:#9AA0A6; --oo-text-muted:#5C636B; --oo-text-onstatus:#ECEEF0;
+    --oo-border:#1E2329; --oo-border-strong:#2A3036;
+    --oo-status-operational-fg:#3FCF5E; --oo-status-operational-tint:rgba(63,207,94,.13);
+    --oo-status-maintenance-fg:#5BA8FF; --oo-status-maintenance-tint:rgba(91,168,255,.13);
+    --oo-status-degraded-fg:#E5B647; --oo-status-degraded-tint:rgba(229,182,71,.13);
+    --oo-status-partial_outage-fg:#F0883E; --oo-status-partial_outage-tint:rgba(240,136,62,.13);
+    --oo-status-major_outage-fg:#F0726A; --oo-status-major_outage-tint:rgba(240,114,106,.13);
+    --oo-status-unknown-fg:#8A93A0; --oo-status-unknown-tint:rgba(138,147,160,.13);
+    --oo-shadow-sm:0 1px 2px rgba(0,0,0,.5); --oo-shadow-md:0 8px 28px rgba(0,0,0,.55);
+    --oo-glow-operational:0 0 8px rgba(63,207,94,.55);
+    color-scheme: dark;
+  }
+}
+
+/* Respect reduced-motion globally: the radar sweep + dot pulse must stop. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; }
+}
