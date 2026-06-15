@@ -32,20 +32,28 @@
     if (feed) feed.href = n ? "/feed.xml?ids=" + ids.join(",") : "/feed.xml";
   }
 
+  function pushState(t) { var s = $("al-push-state"); if (s) s.textContent = t; }
+  function renderPushUI() {
+    var btn = $("al-push-btn"); if (!btn) return;
+    var on = localStorage.getItem(PUSH_ON) === "1";
+    btn.textContent = on ? "🔔 Browser alerts on" : "🔔 Enable browser notifications";
+    btn.classList.toggle("on", on);
+    pushState(on ? "tap to turn off" : "");
+  }
+
   async function enablePush() {
-    var set = function (t) { var s = $("al-push-state"); if (s) s.textContent = t; };
     var providers = stack();
-    if (!providers.length) return set("add services on the board first");
+    if (!providers.length) return pushState("add services on the board first");
     if (typeof Notification !== "undefined" && Notification.permission === "denied") {
-      return set("blocked — allow notifications in site settings, then retry");
+      return pushState("blocked — allow notifications in site settings, then retry");
     }
     try {
       var perm = await Notification.requestPermission();
-      if (perm !== "granted") return set("not enabled");
+      if (perm !== "granted") return pushState("not enabled");
       var reg = await navigator.serviceWorker.register("/sw.js");
       await navigator.serviceWorker.ready;
       var key = (await (await fetch("/api/push/key")).json()).key;
-      if (!key) return set("push unavailable right now");
+      if (!key) return pushState("push unavailable right now");
       var sub = await reg.pushManager.getSubscription()
         || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64ToU8(key) });
       var res = await fetch("/api/push/subscribe", {
@@ -56,10 +64,33 @@
       if (res.ok && d.ok) {
         localStorage.setItem(PUSH_TOKEN, d.token);
         localStorage.setItem(PUSH_ON, "1");
-        set("on — you’ll get a ping when a watched service changes");
-        $("al-push-btn").textContent = "🔔 Browser alerts on";
-      } else { set(d.error || "could not enable"); }
-    } catch (e) { set("could not enable browser alerts"); }
+        renderPushUI();
+      } else { pushState(d.error || "could not enable"); }
+    } catch (e) { pushState("could not enable browser alerts"); }
+  }
+
+  async function disablePush() {
+    try {
+      var reg = await navigator.serviceWorker.getRegistration();
+      var sub = reg && (await reg.pushManager.getSubscription());
+      if (sub) await sub.unsubscribe();
+    } catch (e) {}
+    var token = localStorage.getItem(PUSH_TOKEN);
+    if (token) {
+      try {
+        await fetch("/api/push/unsubscribe", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ token: token }),
+        });
+      } catch (e) {}
+    }
+    localStorage.removeItem(PUSH_ON);
+    localStorage.removeItem(PUSH_TOKEN);
+    renderPushUI();
+  }
+
+  function togglePush() {
+    if (localStorage.getItem(PUSH_ON) === "1") disablePush(); else enablePush();
   }
 
   async function connectHook() {
@@ -86,8 +117,8 @@
     if (!pushSupported()) { var row = $("al-push-row"); if (row) row.style.display = "none"; }
     var pb = $("al-push-btn");
     if (pb) {
-      if (localStorage.getItem(PUSH_ON) === "1") pb.textContent = "🔔 Browser alerts on";
-      pb.addEventListener("click", enablePush);
+      renderPushUI();
+      pb.addEventListener("click", togglePush);
     }
     var hb = $("al-hook-btn");
     if (hb) hb.addEventListener("click", connectHook);
