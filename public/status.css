@@ -125,3 +125,20 @@ a.inc-name:hover { color: var(--oo-accent); }
 .mac-mock .mk-dot { width: 9px; height: 9px; border-radius: 999px; flex: none; }
 .mac-mock .mk-name { color: var(--oo-text-primary); }
 .mac-mock .mk-stat { margin-left: auto; font-family: var(--oo-font-sans); font-size: 11px; font-weight: var(--oo-weight-medium); }
+
+/* ---- /alerts interactive controls ---- */
+.al-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 14px 0 6px; }
+.btn-accent {
+  font-family: var(--oo-font-sans); font-weight: var(--oo-weight-semibold);
+  color: var(--oo-accent-fg); background: var(--oo-accent);
+  border: none; padding: 10px 16px; border-radius: var(--oo-radius-md); cursor: pointer;
+}
+.btn-accent:hover { background: var(--oo-accent-hover); }
+.al-input {
+  flex: 1; min-width: 220px; font-family: var(--oo-font-mono); font-size: 13px;
+  background: var(--oo-bg-sunken); color: var(--oo-text-primary);
+  border: 1px solid var(--oo-border); border-radius: var(--oo-radius-md); padding: 10px 12px; outline: none;
+}
+.al-input::placeholder { color: var(--oo-text-muted); }
+.al-input:focus-visible { box-shadow: 0 0 0 3px var(--oo-focus-ring); border-color: var(--oo-accent); }
+.al-hint { font-family: var(--oo-font-mono); font-size: 12px; color: var(--oo-text-muted); }

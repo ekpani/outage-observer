@@ -48,7 +48,7 @@ function statusPill(level: Level): string {
 }
 
 // ---- Page shell (dark-first, on brand, no app JS) ----
-function shell(opts: { title: string; description: string; canonical: string; jsonld: object[]; body: string; image?: string }): string {
+function shell(opts: { title: string; description: string; canonical: string; jsonld: object[]; body: string; image?: string; script?: string }): string {
   const ld = opts.jsonld.map((o) => `<script type="application/ld+json">${JSON.stringify(o)}</script>`).join("\n");
   const image = opts.image ?? SITE + "/og.png";
   return `<!doctype html>
@@ -98,6 +98,7 @@ ${opts.body}
   <a href="https://ekpani.com" target="_blank" rel="noopener noreferrer">an ekpani tool</a>
 </footer>
 </div>
+${opts.script ? `<script src="${esc(opts.script)}" defer></script>` : ""}
 </body>
 </html>`;
 }
@@ -541,16 +542,31 @@ function renderMac(): string {
   });
 }
 
-// ---- /alerts ----
+// ---- /alerts (set up every channel right here) ----
 function renderAlerts(): string {
   const body = `<nav class="sp-crumbs" aria-label="Breadcrumb"><a href="/">Home</a> / <span>Alerts</span></nav>
 <main class="sp-main">
   <h1>Get alerted</h1>
-  <p class="sp-answer">Pick how you want to hear about it. Outage Observer pings you only for the services you choose, only when they change.</p>
+  <p class="sp-answer">Switch on the channels you want. Outage Observer pings you only for the services you watch, only when they change.</p>
+  <p class="sp-meta" id="al-stack">Loading your services…</p>
 
   <section>
     <h2>🔔 Browser push</h2>
-    <p>The fastest way. On the <a href="/">live board</a>, pick your services and enable browser notifications. They arrive even when the tab is closed. Works in Chrome, Edge, Firefox, and Safari (on iPhone, add the board to your Home Screen first).</p>
+    <p>The fastest way. Notifications arrive even when the tab is closed.</p>
+    <div class="al-row" id="al-push-row">
+      <button class="btn-accent" id="al-push-btn">🔔 Enable browser notifications</button>
+      <span class="al-hint" id="al-push-state"></span>
+    </div>
+    <p class="sp-muted">Chrome, Edge, Firefox, and Safari (on iPhone, add the board to your Home Screen first).</p>
+  </section>
+  <section>
+    <h2>🧩 Slack &amp; Discord</h2>
+    <p>Post changes into a channel. Create an incoming webhook for the channel, then paste its URL:</p>
+    <div class="al-row">
+      <input id="al-hook-url" class="al-input" type="url" inputmode="url" placeholder="Slack or Discord webhook URL" autocomplete="off" spellcheck="false" />
+      <button class="btn-accent" id="al-hook-btn">Connect</button>
+    </div>
+    <span class="al-hint" id="al-hook-state"></span>
   </section>
   <section>
     <h2>🖥 Mac app</h2>
@@ -561,16 +577,12 @@ function renderAlerts(): string {
     <p>Message <a href="https://t.me/outageobserverbot" target="_blank" rel="noopener noreferrer">@outageobserverbot</a>, search and pick your services, and it pings you on every change. Commands: <span class="mono">/start</span>, <span class="mono">/status</span>, <span class="mono">/stop</span>.</p>
   </section>
   <section>
-    <h2>🧩 Slack &amp; Discord</h2>
-    <p>Post changes into a channel. In Slack or Discord, create an incoming webhook for the channel, then paste its URL into the “Get alerts” panel on the <a href="/">board</a>. Updates for your chosen services land in the channel automatically.</p>
-  </section>
-  <section>
     <h2>📡 RSS / Atom</h2>
-    <p>Wire it into your own pipeline. There's a feed for everything, a feed per provider, and a feed for your stack.</p>
+    <p>Wire it into your own pipeline. A feed for everything, a feed per provider, and a feed for your stack.</p>
     <ul class="sp-related sp-stack">
       <li><a href="/feed.xml">/feed.xml</a> — every recent change</li>
       <li><a href="/feed/stripe.xml">/feed/&lt;provider&gt;.xml</a> — one provider</li>
-      <li><span class="mono">/feed.xml?ids=aws,openai,stripe</span> — just your stack</li>
+      <li><a id="al-stack-feed" href="/feed.xml"><span class="mono">/feed.xml?ids=…</span></a> — just your stack</li>
     </ul>
   </section>
   <section>
@@ -580,7 +592,7 @@ function renderAlerts(): string {
 </main>`;
   return shell({
     title: "Get alerts · Outage Observer",
-    description: "Ways to get notified when a service you depend on changes state: browser push, the Mac app, Telegram, Slack/Discord webhooks, and RSS/Atom feeds. Free, no account.",
+    description: "Set up notifications when a service you depend on changes state: browser push, Slack/Discord webhooks, the Mac app, Telegram, and RSS/Atom feeds. Free, no account.",
     canonical: SITE + "/alerts",
     jsonld: [
       crumbLd([{ name: "Home", path: "/" }, { name: "Alerts", path: "/alerts" }]),
@@ -593,6 +605,7 @@ function renderAlerts(): string {
       },
     ],
     body,
+    script: "/alerts.js",
   });
 }
 
