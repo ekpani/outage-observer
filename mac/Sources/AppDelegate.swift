@@ -3,6 +3,21 @@ import SwiftUI
 import Combine
 import CoreText
 
+private extension NSImage {
+    /// A non-template copy of a (template) symbol with `color` baked into its
+    /// pixels, so it renders that colour regardless of the menu bar's appearance.
+    func baked(with color: NSColor) -> NSImage {
+        let out = NSImage(size: size)
+        out.lockFocus()
+        let rect = NSRect(origin: .zero, size: size)
+        draw(in: rect)
+        color.set()
+        rect.fill(using: .sourceAtop)
+        out.unlockFocus()
+        return out
+    }
+}
+
 /// Owns the menu-bar status item and the popover. We use AppKit's NSStatusItem +
 /// NSPopover (rather than SwiftUI's MenuBarExtra) so the popover shows the
 /// standard arrow that stems from the icon and anchors centered beneath it.
@@ -73,20 +88,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    /// The menu-bar reticle. When all is well it's a plain template image, so the
-    /// system renders it white on a dark bar and black on a light bar (always
-    /// visible). When something needs attention it's tinted a saturated colour
-    /// (amber / orange / red / blue) that reads on either bar. We use direct
-    /// NSColors here, not Theme's adaptive colors: converting a SwiftUI dynamic
-    /// Color back to NSColor resolved to a near-black tint and the icon vanished.
+    /// The menu-bar reticle. `contentTintColor` is NOT honoured for status-item
+    /// images on a dark menu bar (the icon falls back to a black template and
+    /// vanishes), so we never use it. When all is well the icon is a plain
+    /// template — the system's own menu-bar treatment renders it white on a dark
+    /// bar, black on a light bar (always visible). When something needs attention
+    /// we bake a saturated colour directly into the image, so it renders that
+    /// colour on any bar with no tinting involved.
     private func updateIcon() {
         guard let button = statusItem?.button else { return }
         let cfg = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
-        let img = NSImage(systemSymbolName: "dot.scope", accessibilityDescription: "Outage Observer")?
+        let base = NSImage(systemSymbolName: "dot.scope", accessibilityDescription: "Outage Observer")?
             .withSymbolConfiguration(cfg)
-        img?.isTemplate = true
-        button.image = img
-        button.contentTintColor = menuBarTint(store.worst)   // nil => adapts to the bar
+        button.contentTintColor = nil
+
+        if let tint = menuBarTint(store.worst), let colored = base?.baked(with: tint) {
+            colored.isTemplate = false
+            button.image = colored
+        } else {
+            base?.isTemplate = true
+            button.image = base
+        }
     }
 
     private func menuBarTint(_ level: Level) -> NSColor? {
@@ -95,7 +117,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .degraded:       return NSColor(hex: 0xE5B647)
         case .partial_outage: return NSColor(hex: 0xF0883E)
         case .major_outage:   return NSColor(hex: 0xF0726A)
-        case .operational, .unknown: return nil   // template adapts: white on dark, black on light
+        case .operational, .unknown: return nil   // plain template adapts to the bar
         }
     }
 }
