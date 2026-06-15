@@ -17,10 +17,13 @@ no keys, no backend of its own.
 - **Notifications** — polls every 30s and fires a local notification on a real
   status transition for a service you watch (never on the first sample, never
   to/from `unknown` — same no-fake-news rule as the rest of the project).
-- **Window** — a fuller "Manage" view: search the full catalog and add/remove
-  services, grouped by category, with live status overlaid.
-- **Settings** — launch at login (SMAppService), notifications on/off, refresh
-  interval.
+- **Everything is in the popover** — there are no separate windows. Onboarding,
+  the board, adding/browsing services, and settings are all routes inside the
+  one menu-bar popover (a window opening on another Space/display felt like
+  nothing happened). The header's **+** opens browse/add; the gear opens
+  settings; a back chevron returns to the board.
+- **Settings** (in the popover) — launch at login (SMAppService), notifications
+  on/off, refresh interval, replay onboarding, reset.
 
 Your "observing" set is stored locally in `UserDefaults`. The app is a menu-bar
 agent (`LSUIElement`), so it has no Dock icon; set `LSUIElement` to `false` in

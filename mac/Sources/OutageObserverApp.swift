@@ -3,7 +3,6 @@ import CoreText
 
 @main
 struct OutageObserverApp: App {
-    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var store = StatusStore.shared
 
     init() {
@@ -14,22 +13,15 @@ struct OutageObserverApp: App {
     }
 
     var body: some Scene {
+        // The entire app lives in this one menu-bar popover — onboarding,
+        // board, browse/add, and settings are all routes inside it. No separate
+        // windows (which open on another Space/display and feel like nothing
+        // happened).
         MenuBarExtra {
             MenuContentView().environmentObject(store)
         } label: {
             MenuBarLabel(worst: store.worst)
         }
         .menuBarExtraStyle(.window)
-
-        Window("Outage Observer", id: "main") {
-            BoardWindowView()
-                .environmentObject(store)
-                .frame(minWidth: 380, minHeight: 480)
-        }
-        .defaultSize(width: 440, height: 640)
-
-        Settings {
-            SettingsView().environmentObject(store)
-        }
     }
 }

@@ -1,36 +1,48 @@
 import SwiftUI
 
-/// The menu-bar popover — the primary surface. Once onboarded it IS your board:
-/// every service you observe, problems pinned to the top.
+let popoverWidth: CGFloat = 340
+
 /// Measures the board's natural content height so the scroll frame fits exactly.
 private struct BoardHeightKey: PreferenceKey {
     static var defaultValue: CGFloat { 0 }
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }
 
+/// The single surface. Everything is a route inside this popover — no windows.
 struct MenuContentView: View {
     @EnvironmentObject var store: StatusStore
-    @Environment(\.openWindow) private var openWindow
     @State private var boardHeight: CGFloat = 0
 
     var body: some View {
+        Group {
+            if !store.onboarded {
+                OnboardingView()
+            } else {
+                switch store.route {
+                case .board: boardScreen
+                case .browse: BrowseView()
+                case .settings: SettingsScreen()
+                }
+            }
+        }
+        .frame(width: popoverWidth)
+        .background(Theme.bgSurface)
+        .preferredColorScheme(.dark)
+        .onAppear { if store.onboarded { Task { await store.refresh() } } }
+    }
+
+    // MARK: Board route
+
+    private var boardScreen: some View {
         VStack(spacing: 0) {
             header
             Divider().overlay(Theme.border)
-            if store.onboarded {
-                statusLine
-                Divider().overlay(Theme.border)
-                board
-                Divider().overlay(Theme.border)
-                footer
-            } else {
-                setupPrompt
-            }
+            statusLine
+            Divider().overlay(Theme.border)
+            board
+            Divider().overlay(Theme.border)
+            footer
         }
-        .frame(width: 320)
-        .background(Theme.bgSurface)
-        .preferredColorScheme(.dark)
-        .onAppear { if store.onboarded { Task { await store.refresh() } } }   // always fresh on open
     }
 
     private var header: some View {
@@ -38,16 +50,13 @@ struct MenuContentView: View {
             Aperture(size: 18)
             Text("outage.observer").font(.mono(13)).foregroundStyle(Theme.textSecondary)
             Spacer()
-            if store.onboarded {
-                iconButton("arrow.clockwise") { Task { await store.refresh() } }.help("Refresh now")
-                iconButton("plus") { openMain() }.help("Add or remove services")
-                settingsButton.help("Settings")
-            }
+            iconButton("arrow.clockwise") { Task { await store.refresh() } }.help("Refresh now")
+            iconButton("plus") { go(.browse) }.help("Add or remove services")
+            iconButton("gearshape") { go(.settings) }.help("Settings")
         }
         .padding(.horizontal, 12).padding(.vertical, 10)
     }
 
-    // A single honest line: green when all clear, the worst color otherwise.
     private var statusLine: some View {
         let n = store.attentionCount
         return HStack(spacing: 9) {
@@ -63,17 +72,13 @@ struct MenuContentView: View {
 
     @ViewBuilder private var board: some View {
         if store.observedProviders.isEmpty {
-            VStack(spacing: 8) {
+            VStack(spacing: 10) {
                 Text("Nothing to watch yet").font(.mono(12)).foregroundStyle(Theme.textMuted)
-                Button("Add services") { openMain() }
+                Button("Add services") { go(.browse) }
                     .buttonStyle(.plain).foregroundStyle(Theme.accent).font(.mono(12))
             }
-            .frame(maxWidth: .infinity).padding(.vertical, 24)
+            .frame(maxWidth: .infinity).padding(.vertical, 26)
         } else {
-            // A ScrollView has no intrinsic height; inside the self-sizing
-            // MenuBarExtra window it collapses to 0 (rows vanish). So measure the
-            // rows' real height and pin the frame to exactly that, capped so long
-            // lists scroll. (A fixed per-row estimate left a gap above the footer.)
             let cap: CGFloat = 396
             let estimate = min(CGFloat(store.observedProviders.count) * 34, cap)
             ScrollView {
@@ -100,28 +105,6 @@ struct MenuContentView: View {
         .padding(.horizontal, 14).padding(.vertical, 9)
     }
 
-    private var setupPrompt: some View {
-        VStack(spacing: 12) {
-            Text("Finish setup to choose what to watch.")
-                .font(.mono(12)).foregroundStyle(Theme.textSecondary).multilineTextAlignment(.center)
-            Button("Get started") { OnboardingController.shared.show() }
-                .buttonStyle(.plain)
-                .font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.bgPage)
-                .padding(.horizontal, 18).padding(.vertical, 9)
-                .background(RoundedRectangle(cornerRadius: 9).fill(Theme.accent))
-            Button("Quit") { NSApp.terminate(nil) }
-                .buttonStyle(.plain).font(.mono(10)).foregroundStyle(Theme.textMuted)
-        }
-        .frame(maxWidth: .infinity).padding(.vertical, 26).padding(.horizontal, 18)
-    }
-
-    private var settingsButton: some View {
-        SettingsLink {
-            Image(systemName: "gearshape").font(.system(size: 12)).foregroundStyle(Theme.textMuted).frame(width: 22, height: 22)
-        }
-        .buttonStyle(.plain)
-    }
-
     private var checkedText: String {
         guard let d = store.checkedAt else { return store.loading ? "checking…" : "—" }
         let f = DateFormatter()
@@ -137,8 +120,35 @@ struct MenuContentView: View {
         .buttonStyle(.plain)
     }
 
-    private func openMain() {
-        openWindow(id: "main")
-        NSApp.activate(ignoringOtherApps: true)
+    private func go(_ r: AppRoute) {
+        withAnimation(.easeOut(duration: 0.15)) { store.route = r }
+    }
+}
+
+// MARK: - Shared in-popover chrome
+
+/// A back-button header used by the browse and settings routes.
+struct RouteHeader: View {
+    @EnvironmentObject var store: StatusStore
+    let title: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Button { withAnimation(.easeOut(duration: 0.15)) { store.route = .board } } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "chevron.left").font(.system(size: 12, weight: .semibold))
+                    Text("Board").font(.mono(11))
+                }
+                .foregroundStyle(Theme.textSecondary)
+            }
+            .buttonStyle(.plain)
+            Spacer()
+            Text(title).font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.textPrimary)
+            Spacer()
+            // Spacer balance so the title stays centered.
+            HStack(spacing: 4) { Image(systemName: "chevron.left"); Text("Board").font(.mono(11)) }
+                .opacity(0).accessibilityHidden(true)
+        }
+        .padding(.horizontal, 12).padding(.vertical, 10)
     }
 }

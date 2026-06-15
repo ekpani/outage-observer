@@ -5,18 +5,15 @@ import SwiftUI
 /// that make it set-and-forget. Crafted, unhurried, no settings dumped on you.
 struct OnboardingView: View {
     @EnvironmentObject var store: StatusStore
-    var onDone: () -> Void
 
-    @State private var step = 0
-    @State private var appeared = false
+    private var step: Int { store.onboardingStep }   // held on the store, survives popover dismiss
 
     var body: some View {
         ZStack {
-            Theme.bgPage.ignoresSafeArea()
+            Theme.bgPage
             // A soft beacon glow, echoing the web radar — atmosphere, not noise.
             RadialGradient(colors: [Theme.accent.opacity(0.10), .clear],
-                           center: .top, startRadius: 0, endRadius: 360)
-                .ignoresSafeArea()
+                           center: .top, startRadius: 0, endRadius: 300)
 
             VStack(spacing: 0) {
                 progressDots
@@ -32,9 +29,8 @@ struct OnboardingView: View {
                     removal: .move(edge: .leading).combined(with: .opacity)))
             }
         }
-        .frame(width: 460, height: 640)
+        .frame(height: 560)
         .preferredColorScheme(.dark)
-        .environmentObject(store)
     }
 
     private var progressDots: some View {
@@ -46,16 +42,15 @@ struct OnboardingView: View {
                     .animation(.spring(response: 0.4, dampingFraction: 0.8), value: step)
             }
         }
-        .padding(.top, 22)
+        .padding(.top, 18)
     }
 
     private func go(_ s: Int) {
-        withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) { step = s }
+        withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) { store.onboardingStep = s }
     }
 
     private func finish() {
         store.completeOnboarding()
-        onDone()
     }
 }
 
@@ -66,25 +61,25 @@ private struct WelcomeStep: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            RadarView(size: 168).padding(.top, 28)
+            RadarView(size: 132).padding(.top, 24)
             Text("Outage Observer")
-                .font(.system(size: 26, weight: .semibold))
+                .font(.system(size: 22, weight: .semibold))
                 .foregroundStyle(Theme.textPrimary)
-                .padding(.top, 22)
+                .padding(.top, 18)
             Text("Know the moment your stack breaks.")
-                .font(.mono(13)).foregroundStyle(Theme.textSecondary)
-                .padding(.top, 8)
+                .font(.mono(12)).foregroundStyle(Theme.textSecondary)
+                .padding(.top, 7)
 
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 14) {
                 point("scope", "A quiet reticle in your menu bar", "glows amber or red when something you watch has trouble")
-                point("bell.badge", "A notification the instant it happens", "no dashboards to keep open, no refreshing")
+                point("bell.badge", "A notification the instant it happens", "no dashboards, no refreshing")
                 point("moon.stars", "Silence the rest of the time", "you only hear from it when it matters")
             }
-            .padding(.top, 34).padding(.horizontal, 48)
+            .padding(.top, 28).padding(.horizontal, 28)
 
-            Spacer(minLength: 16)
+            Spacer(minLength: 12)
             PrimaryButton(title: "Get started", action: onContinue)
-                .padding(.horizontal, 48).padding(.bottom, 36)
+                .padding(.horizontal, 28).padding(.bottom, 28)
         }
     }
 
@@ -120,14 +115,14 @@ private struct ChooseStep: View {
         VStack(spacing: 0) {
             VStack(spacing: 6) {
                 Text("What do you depend on?")
-                    .font(.system(size: 22, weight: .semibold)).foregroundStyle(Theme.textPrimary)
-                Text("Pick the services you run on. Outage Observer watches\njust these and ignores everything else.")
+                    .font(.system(size: 20, weight: .semibold)).foregroundStyle(Theme.textPrimary)
+                Text("Pick the services you run on. Outage Observer\nwatches just these and ignores the rest.")
                     .font(.mono(11)).foregroundStyle(Theme.textSecondary)
                     .multilineTextAlignment(.center).lineSpacing(2)
             }
-            .padding(.top, 28).padding(.horizontal, 36)
+            .padding(.top, 22).padding(.horizontal, 24)
 
-            searchField.padding(.horizontal, 36).padding(.top, 18)
+            searchField.padding(.horizontal, 24).padding(.top, 16)
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
@@ -174,7 +169,7 @@ private struct ChooseStep: View {
         Text(s.uppercased())
             .font(.system(size: 10, weight: .semibold)).tracking(1.2)
             .foregroundStyle(Theme.textSecondary)
-            .padding(.horizontal, 36).padding(.top, 18).padding(.bottom, 7)
+            .padding(.horizontal, 24).padding(.top, 16).padding(.bottom, 6)
     }
 
     private func pickRow(_ e: CatalogEntry) -> some View {
@@ -186,7 +181,7 @@ private struct ChooseStep: View {
                 Text(e.name).font(.mono(13)).foregroundStyle(Theme.textPrimary)
                 Spacer()
             }
-            .padding(.horizontal, 36).padding(.vertical, 7)
+            .padding(.horizontal, 24).padding(.vertical, 7)
             .background(on ? Theme.accent.opacity(0.06) : .clear)
             .contentShape(Rectangle())
         }
@@ -205,7 +200,7 @@ private struct ChooseStep: View {
             PrimaryButton(title: store.observing.isEmpty ? "Choose at least one" : "Continue · \(store.observing.count)",
                           action: onContinue, disabled: store.observing.isEmpty)
         }
-        .padding(.horizontal, 36).padding(.vertical, 16)
+        .padding(.horizontal, 24).padding(.vertical, 14)
         .background(Theme.bgPage.shadow(.drop(color: .black.opacity(0.3), radius: 8, y: -4)))
     }
 }
@@ -249,13 +244,13 @@ private struct ReadyStep: View {
     var body: some View {
         VStack(spacing: 0) {
             Spacer()
-            Aperture(size: 52)
+            Aperture(size: 50)
             Text("Set it, forget it")
-                .font(.system(size: 22, weight: .semibold)).foregroundStyle(Theme.textPrimary)
-                .padding(.top, 22)
+                .font(.system(size: 21, weight: .semibold)).foregroundStyle(Theme.textPrimary)
+                .padding(.top, 20)
             Text("Two switches and you'll never babysit a status page again.")
                 .font(.mono(11)).foregroundStyle(Theme.textSecondary)
-                .multilineTextAlignment(.center).padding(.top, 8).padding(.horizontal, 40)
+                .multilineTextAlignment(.center).padding(.top, 8).padding(.horizontal, 28)
 
             VStack(spacing: 12) {
                 toggleCard(icon: "bell.badge.fill", on: notifGranted,
@@ -270,7 +265,7 @@ private struct ReadyStep: View {
                     launch.enabled.toggle()
                 }
             }
-            .padding(.top, 32).padding(.horizontal, 40)
+            .padding(.top, 28).padding(.horizontal, 28)
 
             Spacer()
             HStack(spacing: 12) {
@@ -282,7 +277,7 @@ private struct ReadyStep: View {
                 .buttonStyle(.plain)
                 PrimaryButton(title: "Start watching · \(store.observing.count)", action: onFinish)
             }
-            .padding(.horizontal, 40).padding(.bottom, 40)
+            .padding(.horizontal, 28).padding(.bottom, 32)
         }
         .onAppear { NotificationManager.shared.isAuthorized { notifGranted = $0 } }
     }

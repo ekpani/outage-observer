@@ -1,6 +1,9 @@
 import AppKit
 import SwiftUI
 
+/// Which screen the popover is showing (everything lives in the popover now).
+enum AppRoute { case board, browse, settings }
+
 /// Single source of truth. Polls /api/status, holds the snapshot + the user's
 /// "observing" set, and fires notifications on transitions among observed
 /// services. @MainActor so all @Published mutations are on the main thread.
@@ -36,6 +39,11 @@ final class StatusStore: ObservableObject {
     @Published var interval: Double {
         didSet { UserDefaults.standard.set(interval, forKey: "interval"); startPolling() }
     }
+
+    // In-popover navigation. Held on the singleton so the route/step survive the
+    // popover being dismissed (click-away) and restored on reopen.
+    @Published var route: AppRoute = .board
+    @Published var onboardingStep: Int = 0
 
     private var lastLevels: [String: Level] = [:]
     private var pollTask: Task<Void, Never>?
@@ -94,12 +102,13 @@ final class StatusStore: ObservableObject {
     func open(_ provider: Provider) { NSWorkspace.shared.open(statusURL(for: provider.id)) }
     func open(id: String) { NSWorkspace.shared.open(statusURL(for: id)) }
 
-    func completeOnboarding() { onboarded = true }
+    func completeOnboarding() { onboarded = true; route = .board }
 
     /// Re-run onboarding, keeping current picks (they show pre-selected).
     func replayOnboarding() {
+        onboardingStep = 0
+        route = .board
         onboarded = false
-        OnboardingController.shared.show()
     }
 
     /// Wipe everything back to a first-launch state and re-run onboarding.
@@ -109,8 +118,9 @@ final class StatusStore: ObservableObject {
         interval = 30
         lastLevels = [:]
         snapshot = [:]
+        onboardingStep = 0
+        route = .board
         onboarded = false
-        OnboardingController.shared.show()
     }
 
     // MARK: Polling (only while onboarded)
