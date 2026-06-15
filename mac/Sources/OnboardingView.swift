@@ -63,19 +63,14 @@ struct OnboardingView: View {
 
 private struct WelcomeStep: View {
     var onContinue: () -> Void
-    @State private var pulse = false
 
     var body: some View {
         VStack(spacing: 0) {
-            Spacer()
-            Aperture(size: 76)
-                .scaleEffect(pulse ? 1.0 : 0.92)
-                .shadow(color: Theme.accent.opacity(0.35), radius: pulse ? 26 : 10)
-                .animation(.easeInOut(duration: 2.4).repeatForever(autoreverses: true), value: pulse)
+            RadarView(size: 168).padding(.top, 28)
             Text("Outage Observer")
                 .font(.system(size: 26, weight: .semibold))
                 .foregroundStyle(Theme.textPrimary)
-                .padding(.top, 26)
+                .padding(.top, 22)
             Text("Know the moment your stack breaks.")
                 .font(.mono(13)).foregroundStyle(Theme.textSecondary)
                 .padding(.top, 8)
@@ -85,13 +80,12 @@ private struct WelcomeStep: View {
                 point("bell.badge", "A notification the instant it happens", "no dashboards to keep open, no refreshing")
                 point("moon.stars", "Silence the rest of the time", "you only hear from it when it matters")
             }
-            .padding(.top, 40).padding(.horizontal, 48)
+            .padding(.top, 34).padding(.horizontal, 48)
 
-            Spacer()
+            Spacer(minLength: 16)
             PrimaryButton(title: "Get started", action: onContinue)
-                .padding(.horizontal, 48).padding(.bottom, 40)
+                .padding(.horizontal, 48).padding(.bottom, 36)
         }
-        .onAppear { pulse = true }
     }
 
     private func point(_ icon: String, _ title: String, _ sub: String) -> some View {

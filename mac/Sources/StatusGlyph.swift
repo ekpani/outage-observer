@@ -80,6 +80,48 @@ struct Aperture: View {
     }
 }
 
+/// A continuously-rotating radar sweep with concentric scope rings and the
+/// aperture at center — the site's radar motif. Rotates linearly forever (no
+/// boomerang / auto-reverse). Used as the onboarding hero.
+struct RadarView: View {
+    var size: CGFloat = 168
+    @State private var spin = false
+
+    var body: some View {
+        ZStack {
+            // Concentric scope rings (inner brighter, like the site).
+            ForEach(1...4, id: \.self) { i in
+                Circle()
+                    .stroke(Theme.accent.opacity(0.05 + Double(4 - i) * 0.035), lineWidth: 1)
+                    .frame(width: size * CGFloat(i) / 4, height: size * CGFloat(i) / 4)
+            }
+            // The sweep: a wedge of accent that fades, rotating continuously.
+            AngularGradient(
+                stops: [
+                    .init(color: Theme.accent.opacity(0.34), location: 0.0),
+                    .init(color: Theme.accent.opacity(0.06), location: 0.10),
+                    .init(color: .clear, location: 0.30),
+                    .init(color: .clear, location: 1.0),
+                ],
+                center: .center
+            )
+            .clipShape(Circle())
+            .frame(width: size, height: size)
+            .rotationEffect(.degrees(spin ? 360 : 0))
+            .animation(.linear(duration: 7).repeatForever(autoreverses: false), value: spin)
+
+            Aperture(size: size * 0.34)
+                .shadow(color: Theme.accent.opacity(0.4), radius: 12)
+        }
+        .frame(width: size, height: size)
+        .mask(
+            RadialGradient(colors: [.black, .black, .clear],
+                           center: .center, startRadius: size * 0.18, endRadius: size * 0.54)
+        )
+        .onAppear { spin = true }
+    }
+}
+
 /// Menu-bar icon. A reticle symbol tinted by the worst observed status (green
 /// when all clear, amber/red when something's wrong). Using an explicit
 /// saturated colour keeps it visible on BOTH light and dark menu bars — a
