@@ -11,6 +11,11 @@ permissions:
 jobs:
   build:
     runs-on: macos-14
+    env:
+      # When the signing secrets are present we produce a Developer ID signed +
+      # notarized build (no Gatekeeper warning). Otherwise we ad-hoc sign so the
+      # app at least runs (an unsigned arm64 binary won't launch at all).
+      HAS_CERT: ${{ secrets.MAC_CERT_P12_BASE64 != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -21,12 +26,50 @@ jobs:
         working-directory: mac
         run: xcodegen generate
 
-      - name: Build (Release, unsigned)
-        working-directory: mac
+      - name: Import Developer ID certificate
+        if: env.HAS_CERT == 'true'
+        env:
+          CERT_B64: ${{ secrets.MAC_CERT_P12_BASE64 }}
+          CERT_PW: ${{ secrets.MAC_CERT_PASSWORD }}
         run: |
-          xcodebuild -project OutageObserver.xcodeproj -scheme OutageObserver \
-            -configuration Release -derivedDataPath .build \
-            CODE_SIGNING_ALLOWED=NO build
+          KEYCHAIN="$RUNNER_TEMP/build.keychain-db"
+          security create-keychain -p actions "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p actions "$KEYCHAIN"
+          echo "$CERT_B64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" -P "$CERT_PW" -T /usr/bin/codesign
+          security list-keychains -d user -s "$KEYCHAIN" login.keychain-db
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k actions "$KEYCHAIN"
+
+      - name: Build & sign
+        working-directory: mac
+        env:
+          SIGN_ID: ${{ secrets.MAC_SIGN_IDENTITY }}
+        run: |
+          if [ "$HAS_CERT" = "true" ]; then
+            xcodebuild -project OutageObserver.xcodeproj -scheme OutageObserver \
+              -configuration Release -derivedDataPath .build \
+              CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="$SIGN_ID" \
+              OTHER_CODE_SIGN_FLAGS="--timestamp --options runtime" build
+          else
+            xcodebuild -project OutageObserver.xcodeproj -scheme OutageObserver \
+              -configuration Release -derivedDataPath .build \
+              CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=NO build
+          fi
+
+      - name: Notarize & staple
+        if: env.HAS_CERT == 'true'
+        working-directory: mac
+        env:
+          NOTARY_APPLE_ID: ${{ secrets.MAC_NOTARY_APPLE_ID }}
+          NOTARY_PASSWORD: ${{ secrets.MAC_NOTARY_PASSWORD }}
+          NOTARY_TEAM_ID: ${{ secrets.MAC_NOTARY_TEAM_ID }}
+        run: |
+          APP=".build/Build/Products/Release/Outage Observer.app"
+          ditto -c -k --keepParent "$APP" notarize.zip
+          xcrun notarytool submit notarize.zip \
+            --apple-id "$NOTARY_APPLE_ID" --password "$NOTARY_PASSWORD" --team-id "$NOTARY_TEAM_ID" --wait
+          xcrun stapler staple "$APP"
 
       - name: Package
         working-directory: mac
@@ -40,7 +83,9 @@ jobs:
         with:
           files: mac/Outage-Observer-macos.zip
           body: |
-            Outage Observer for Mac — menu-bar status + notifications.
+            **Outage Observer for Mac** — a menu-bar status app with notifications.
+            Requires macOS 14+. Download, unzip, and drag to Applications.
 
-            Unsigned build: on first launch, right-click the app → **Open** to get
-            past Gatekeeper. Requires macOS 14+.
+            If macOS says it can't verify the developer, right-click the app →
+            **Open** (or System Settings → Privacy & Security → **Open Anyway**).
+            Notarized builds open without any prompt.
