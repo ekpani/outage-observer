@@ -320,7 +320,41 @@ export async function handleSeo(env: Env, url: URL): Promise<Response | null> {
       headers: { "content-type": "text/markdown; charset=utf-8", "cache-control": "public, max-age=3600, s-maxage=3600" },
     });
   }
+  if (path === "/privacy") return html(renderPrivacy());
   return null;
+}
+
+/** Privacy policy — required for App Store Connect. Outage Observer collects no
+ *  personal data; this states that plainly. */
+function renderPrivacy(): string {
+  const body = `<nav class="sp-crumbs" aria-label="Breadcrumb"><a href="/">Home</a> / <span>Privacy</span></nav>
+<main class="sp-main">
+  <h1>Privacy</h1>
+  <p class="sp-answer">Outage Observer does not collect, store, sell, or share any personal data.</p>
+  <section>
+    <h2>What the apps do</h2>
+    <p>The web board, the Mac app, and the Telegram bot read a single public status feed (<span class="mono">outage.observer/api/status</span>) that we compile from providers' official status pages. The Mac app and website keep your chosen services and preferences <strong>locally on your device</strong> (UserDefaults / localStorage); they are never sent to us.</p>
+  </section>
+  <section>
+    <h2>What we don't do</h2>
+    <p>No accounts, no analytics, no tracking, no advertising identifiers, no third-party SDKs. We do not build user profiles. Like any website, our server receives standard request logs (e.g. IP address) to serve traffic and stop abuse; these are not used to identify or track you and are not sold.</p>
+  </section>
+  <section>
+    <h2>Notifications</h2>
+    <p>Browser, Telegram, Slack/Discord, and Mac notifications are sent only for the services you choose to watch. You can turn them off at any time. Telegram subscriptions are stored only as the chat ID needed to deliver your alerts and are deleted when you stop the bot.</p>
+  </section>
+  <section>
+    <h2>Contact</h2>
+    <p>Questions: <a href="https://github.com/ekpani/outage-observer" target="_blank" rel="noopener noreferrer">github.com/ekpani/outage-observer</a>.</p>
+  </section>
+</main>`;
+  return shell({
+    title: "Privacy · Outage Observer",
+    description: "Outage Observer collects no personal data. No accounts, no analytics, no tracking.",
+    canonical: SITE + "/privacy",
+    jsonld: [],
+    body,
+  });
 }
 
 function notFoundPage(): string {

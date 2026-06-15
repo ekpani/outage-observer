@@ -17,6 +17,7 @@ targets:
     sources:
       - path: Sources
       - path: Resources/DepartureMono-Regular.otf
+      - path: Resources/DepartureMono-LICENSE.txt
       - path: Resources/AppIcon.icns
     settings:
       base:

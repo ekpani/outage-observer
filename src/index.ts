@@ -65,7 +65,7 @@ export default {
 
     // SEO / AEO surfaces: server-rendered provider pages, the directory,
     // sitemap, and llms.txt. Edge-cached so crawlers don't hit KV/D1 each time.
-    if (request.method === "GET" && (url.pathname === "/status" || url.pathname.startsWith("/status/") || url.pathname === "/sitemap.xml" || url.pathname === "/llms.txt")) {
+    if (request.method === "GET" && (url.pathname === "/status" || url.pathname.startsWith("/status/") || url.pathname === "/sitemap.xml" || url.pathname === "/llms.txt" || url.pathname === "/privacy")) {
       const cache = caches.default;
       const cacheKey = new Request(url.toString());
       const hit = await cache.match(cacheKey);
