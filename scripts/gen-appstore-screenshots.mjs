@@ -4,7 +4,7 @@
 //
 //   node scripts/gen-appstore-screenshots.mjs
 import { Resvg } from "@resvg/resvg-js";
-import { writeFileSync, mkdirSync } from "node:fs";
+import { writeFileSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -213,7 +213,27 @@ function notifBanner(x, y) {
   </g>`;
 }
 
+// Hero screenshot: the OG card, framed on the brand backdrop at App Store size.
+function heroFromOG(name) {
+  C = DARK;
+  const b64 = readFileSync(join(here, "..", "public", "og.png")).toString("base64");
+  const cardW = 2360, cardH = Math.round((cardW * 630) / 1200);
+  const x = (W - cardW) / 2, y = (H - cardH) / 2;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+    ${backdrop()}
+    <defs><clipPath id="card"><rect x="${x}" y="${y}" width="${cardW}" height="${cardH}" rx="30"/></clipPath></defs>
+    <rect x="${x}" y="${y}" width="${cardW}" height="${cardH}" rx="30" fill="#000"/>
+    <image x="${x}" y="${y}" width="${cardW}" height="${cardH}" clip-path="url(#card)" href="data:image/png;base64,${b64}"/>
+    <rect x="${x}" y="${y}" width="${cardW}" height="${cardH}" rx="30" fill="none" stroke="${C.borderStrong}" stroke-width="2"/>
+  </svg>`;
+  const png = new Resvg(svg, { font: { fontFiles: [fontPath], defaultFontFamily: mono, loadSystemFonts: false } }).render().asPng();
+  writeFileSync(join(OUT, name + ".png"), png);
+  console.log("wrote", name + ".png");
+}
+
 mkdirSync(OUT, { recursive: true });
+
+heroFromOG("00-hero");
 
 screen("01-board", {
   title: "Your stack's status,\nin your menu bar",
