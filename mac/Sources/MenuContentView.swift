@@ -50,9 +50,12 @@ struct MenuContentView: View {
             Aperture(size: 18)
             Text("outage.observer").font(.mono(13)).foregroundStyle(Theme.textSecondary)
             Spacer()
-            iconButton("arrow.clockwise") { Task { await store.refresh() } }.help("Refresh now")
-            iconButton("plus") { go(.browse) }.help("Add or remove services")
-            iconButton("gearshape") { go(.settings) }.help("Settings")
+            iconButton("arrow.clockwise") { Task { await store.refresh() } }
+                .help("Refresh now").accessibilityLabel("Refresh now")
+            iconButton("plus") { go(.browse) }
+                .help("Add or remove services").accessibilityLabel("Add or remove services")
+            iconButton("gearshape") { go(.settings) }
+                .help("Settings").accessibilityLabel("Settings")
         }
         .padding(.horizontal, 12).padding(.vertical, 10)
     }

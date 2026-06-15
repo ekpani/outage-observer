@@ -14,14 +14,24 @@ const fontPath = join(here, "DepartureMono-Regular.otf");
 
 const W = 2560, H = 1600;
 
-// Dark theme tokens (from tokens.css).
-const C = {
+// Theme tokens (from tokens.css). `C` is swapped per screen (dark default).
+const DARK = {
   surface: "#0C0E11", elevated: "#15181C", sunken: "#070809",
   border: "#1E2329", borderStrong: "#2A3036",
   primary: "#ECEEF0", secondary: "#9AA0A6", muted: "#5C636B", accent: "#3FCF5E",
   operational: "#3FCF5E", maintenance: "#5BA8FF", degraded: "#E5B647",
   partial_outage: "#F0883E", major_outage: "#F0726A", unknown: "#8A93A0",
+  bg0: "#0a0d12", bg1: "#06080a", onBg: "#ECEEF0", onBgMuted: "#9AA0A6",
 };
+const LIGHT = {
+  surface: "#FFFFFF", elevated: "#FFFFFF", sunken: "#F1F0ED",
+  border: "#E6E7E9", borderStrong: "#D5D7DA",
+  primary: "#16181B", secondary: "#5B636E", muted: "#8A929C", accent: "#1A7F37",
+  operational: "#1A7F37", maintenance: "#1F6FEB", degraded: "#946400",
+  partial_outage: "#B14A00", major_outage: "#C0362C", unknown: "#5B636E",
+  bg0: "#ECEBE7", bg1: "#DFDDD7", onBg: "#16181B", onBgMuted: "#5B636E",
+};
+let C = DARK;
 const LABEL = {
   operational: "Operational", maintenance: "Maintenance", degraded: "Degraded",
   partial_outage: "Partial outage", major_outage: "Major outage", unknown: "Unknown",
@@ -90,26 +100,27 @@ function boardPopover(x, y, w, rows) {
 function backdrop(glowX, glowY) {
   return `<defs>
     <linearGradient id="bg" x1="0" y1="0" x2="0.4" y2="1">
-      <stop offset="0" stop-color="#0a0d12"/><stop offset="1" stop-color="#06080a"/>
+      <stop offset="0" stop-color="${C.bg0}"/><stop offset="1" stop-color="${C.bg1}"/>
     </linearGradient>
     <radialGradient id="glow" cx="${glowX}" cy="${glowY}" r="0.5">
-      <stop offset="0" stop-color="#3FCF5E" stop-opacity="0.16"/>
-      <stop offset="1" stop-color="#3FCF5E" stop-opacity="0"/>
+      <stop offset="0" stop-color="${C.accent}" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="${C.accent}" stop-opacity="0"/>
     </radialGradient>
   </defs>
   <rect width="${W}" height="${H}" fill="url(#bg)"/>
   <rect width="${W}" height="${H}" fill="url(#glow)"/>
-  ${[1, 2, 3, 4, 5].map((i) => `<circle cx="${W * 0.82}" cy="${H * 0.5}" r="${i * 150}" fill="none" stroke="#3FCF5E" stroke-width="1.5" opacity="${0.05 - i * 0.006}"/>`).join("")}`;
+  ${[1, 2, 3, 4, 5].map((i) => `<circle cx="${W * 0.82}" cy="${H * 0.5}" r="${i * 150}" fill="none" stroke="${C.accent}" stroke-width="1.5" opacity="${0.05 - i * 0.006}"/>`).join("")}`;
 }
 
 function headline(title, sub, x, y) {
   const lines = title.split("\n");
-  let t = lines.map((l, i) => `<text x="${x}" y="${y + i * 92}" font-family="${mono}" font-size="76" fill="${C.primary}" letter-spacing="-1">${esc(l)}</text>`).join("");
-  t += `<text x="${x}" y="${y + lines.length * 92 + 28}" font-family="${mono}" font-size="34" fill="${C.secondary}">${esc(sub)}</text>`;
+  let t = lines.map((l, i) => `<text x="${x}" y="${y + i * 92}" font-family="${mono}" font-size="76" fill="${C.onBg}" letter-spacing="-1">${esc(l)}</text>`).join("");
+  t += `<text x="${x}" y="${y + lines.length * 92 + 28}" font-family="${mono}" font-size="34" fill="${C.onBgMuted}">${esc(sub)}</text>`;
   return t;
 }
 
-function screen(name, { title, sub, rows, extra }) {
+function screen(name, { title, sub, rows, extra, theme }) {
+  C = theme === "light" ? LIGHT : DARK;
   const popW = 760;
   const popX = W - popW - 220;
   const tmp = boardPopover(popX, 0, popW, rows || []);
@@ -142,8 +153,8 @@ function notifBanner(x, y) {
 mkdirSync(OUT, { recursive: true });
 
 screen("01-board", {
-  title: "Your whole stack,\nin the menu bar",
-  sub: "Live status of every service you run on.",
+  title: "Your stack's status,\nin your menu bar",
+  sub: "Every provider you depend on, live.",
   rows: [
     { name: "Stripe", level: "degraded" },
     { name: "Amazon Web Services", level: "operational" },
@@ -155,8 +166,8 @@ screen("01-board", {
 });
 
 screen("02-alerts", {
-  title: "Know the instant\nsomething breaks",
-  sub: "A native notification the moment a service changes.",
+  title: "Know the second\nit breaks",
+  sub: "A native alert the moment a service changes state.",
   rows: [
     { name: "Stripe", level: "degraded" },
     { name: "Anthropic", level: "operational" },
@@ -166,9 +177,21 @@ screen("02-alerts", {
   extra: notifBanner(W - 760 - 220, 150),
 });
 
-screen("03-allclear", {
-  title: "Quiet until\nit matters",
-  sub: "All green? You'll never hear from it.",
+screen("03-focused", {
+  title: "Watch only what\nyou run on",
+  sub: "Pick your services. Skip the rest of the internet.",
+  rows: [
+    { name: "Anthropic", level: "operational" },
+    { name: "OpenAI", level: "operational" },
+    { name: "Cloudflare", level: "operational" },
+    { name: "Supabase", level: "maintenance" },
+  ],
+});
+
+screen("04-light", {
+  theme: "light",
+  title: "Light or dark.\nFollows your Mac.",
+  sub: "Native, fast, and private — no account, no tracking.",
   rows: [
     { name: "Amazon Web Services", level: "operational" },
     { name: "Cloudflare", level: "operational" },

@@ -77,6 +77,17 @@ final class StatusStore: ObservableObject {
         interval = (d.object(forKey: "interval") as? Double) ?? 30
         appearance = Appearance(rawValue: d.string(forKey: "appearance") ?? "") ?? .system
 
+        // Show the last-known board immediately, even offline or if the API is
+        // unreachable at launch. Display-only: we deliberately do NOT seed
+        // lastLevels from the cache, so the first live fetch never fires a
+        // notification for a change that happened while the app was closed
+        // (no stale alerts). The shown "checked" time stays honest.
+        if let data = d.data(forKey: "cachedSnapshot"),
+           let snap = try? JSONDecoder().decode(Snapshot.self, from: data) {
+            snapshot = Dictionary(uniqueKeysWithValues: snap.providers.map { ($0.id, $0) })
+            if let ms = snap.checkedAt { checkedAt = Date(timeIntervalSince1970: ms / 1000) }
+        }
+
         if onboarded { startPolling() }
     }
 
@@ -182,6 +193,7 @@ final class StatusStore: ObservableObject {
             snapshot = Dictionary(uniqueKeysWithValues: snap.providers.map { ($0.id, $0) })
             if let ms = snap.checkedAt { checkedAt = Date(timeIntervalSince1970: ms / 1000) }
             lastError = nil
+            UserDefaults.standard.set(data, forKey: "cachedSnapshot")   // resilience: last-known on next launch
         } catch {
             lastError = error.localizedDescription
         }

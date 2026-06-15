@@ -36,8 +36,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         item.button?.target = self
         item.button?.action = #selector(togglePopover(_:))
         item.button?.toolTip = "Outage Observer"
+        item.button?.setAccessibilityLabel("Outage Observer status")
         statusItem = item
         updateIcon()
+
+        // First launch: a menu-bar agent has no window, so open the popover once
+        // so onboarding isn't missed. (Next runloop tick, when the button is laid
+        // out and can anchor the popover.)
+        if !store.onboarded {
+            Task { @MainActor in self.showPopover() }
+        }
 
         // Recolor the icon whenever anything that affects the worst status
         // changes. objectWillChange fires before the value updates, so read it
@@ -54,14 +62,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func togglePopover(_ sender: Any?) {
-        guard let button = statusItem?.button, let pop = popover else { return }
-        if pop.isShown {
-            pop.performClose(sender)
-        } else {
-            pop.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-            pop.contentViewController?.view.window?.makeKey()
-            NSApp.activate(ignoringOtherApps: true)
-        }
+        guard let pop = popover else { return }
+        if pop.isShown { pop.performClose(sender) } else { showPopover() }
+    }
+
+    private func showPopover() {
+        guard let button = statusItem?.button, let pop = popover, !pop.isShown else { return }
+        pop.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        pop.contentViewController?.view.window?.makeKey()
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     /// A reticle that stems-from-nothing visually but is tinted by the worst

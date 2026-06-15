@@ -56,6 +56,20 @@ struct ProviderRow: View {
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
         .onTapGesture { (showToggle ? onToggle : onOpen)?() }
+        // VoiceOver reads one phrase per row instead of the decorative glyph.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(accessibilityText))
+        .accessibilityAddTraits(.isButton)
+        .accessibilityHint(Text(showToggle
+            ? (observing ? "Double-tap to stop watching" : "Double-tap to watch")
+            : "Double-tap to open the status page"))
+    }
+
+    private var accessibilityText: String {
+        if showToggle {
+            return "\(provider.name), \(observing ? "watching" : "not watching")"
+        }
+        return "\(provider.name), \(provider.level.label)"
     }
 
     private var rowBackground: some View {
