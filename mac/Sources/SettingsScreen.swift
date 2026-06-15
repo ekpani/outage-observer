@@ -52,6 +52,7 @@ struct SettingsScreen: View {
 
                     group("About")
                     infoRow("Version", appVersion)
+                    tapRow("Check for updates…") { UpdaterManager.shared.checkForUpdates() }
                     linkRow("outage.observer", "https://outage.observer")
                     linkRow("Source on GitHub", "https://github.com/ekpani/outage-observer")
                 }

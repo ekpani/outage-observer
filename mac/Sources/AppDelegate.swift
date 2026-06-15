@@ -52,6 +52,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
         }
 
+        // Start Sparkle (scheduled background update checks).
+        _ = UpdaterManager.shared
+
         let pop = NSPopover()
         pop.behavior = .transient                 // closes on click-outside
         pop.animates = true

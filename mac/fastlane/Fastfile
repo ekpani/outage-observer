@@ -8,10 +8,11 @@
 # (gitignored), or export them:
 #   ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_PATH  (path to the downloaded .p8)
 #
-# Outage Observer is a sandboxed, network-client-only app with no restricted
-# capabilities (no push / iCloud / app groups), so a Developer ID build needs
-# NO provisioning profile — automatic signing resolves the Developer ID cert in
-# the keychain directly. Simpler than apps that need a pinned profile.
+# Outage Observer is a network-client-only app with no restricted capabilities
+# (no push / iCloud / app groups), so a Developer ID build needs NO provisioning
+# profile — signing resolves the Developer ID cert in the keychain directly. It
+# is NOT sandboxed (so Sparkle can self-update); security comes from the Hardened
+# Runtime + notarization. Simpler than apps that need a pinned profile.
 
 opt_out_usage
 
@@ -63,8 +64,30 @@ platform :mac do
       identity = sh("security find-identity -v -p codesigning | awk '/Developer ID Application/{print $2; exit}'").strip
       UI.user_error!("No 'Developer ID Application' identity in the keychain") if identity.empty?
 
+      # We built with CODE_SIGNING_ALLOWED=NO, so the embedded Sparkle.framework
+      # and its helpers are unsigned. Notarization requires every nested Mach-O to
+      # be Developer-ID-signed with the Hardened Runtime, and codesign must seal
+      # inside-out — sign the deepest helpers first, then the framework, then the
+      # app. (No entitlements on the helpers: the app is not sandboxed, so the
+      # default Sparkle XPC services need none.)
+      sign = lambda do |path|
+        sh(%Q{codesign --force --options runtime --timestamp -s #{identity} "#{path}"}) if File.exist?(path)
+      end
+      fw = "#{app}/Contents/Frameworks/Sparkle.framework"
+      if File.exist?(fw)
+        v = "#{fw}/Versions/Current"
+        [
+          "#{v}/XPCServices/Downloader.xpc",
+          "#{v}/XPCServices/Installer.xpc",
+          "#{v}/Updater.app",
+          "#{v}/Autoupdate",
+          fw,
+        ].each { |p| sign.call(p) }
+      end
+
       sh(%Q{codesign --force --options runtime --timestamp --entitlements Resources/OutageObserver.entitlements -s #{identity} "#{app}"})
-      sh(%Q{codesign --verify --strict --verbose=2 "#{app}"})
+      # --deep --strict so verification also walks the nested Sparkle code.
+      sh(%Q{codesign --verify --deep --strict --verbose=2 "#{app}"})
 
       sh("mkdir -p build/mac && rm -rf 'build/mac/Outage Observer.app' && ditto '#{app}' 'build/mac/Outage Observer.app'")
 

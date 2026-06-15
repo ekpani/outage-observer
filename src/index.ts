@@ -63,6 +63,17 @@ export default {
       if (feed) return feed;
     }
 
+    // Sparkle auto-update feed for the Mac app. We keep a branded, stable URL
+    // here and redirect to the appcast asset on the rolling `mac-latest` GitHub
+    // release (regenerated and re-signed by CI on every Mac release). 302 (not
+    // 301) so the target can move; Sparkle follows the redirect.
+    if (request.method === "GET" && url.pathname === "/appcast.xml") {
+      return Response.redirect(
+        "https://github.com/ekpani/outage-observer/releases/download/mac-latest/appcast.xml",
+        302,
+      );
+    }
+
     // SEO / AEO surfaces: server-rendered provider pages, the directory,
     // sitemap, and llms.txt. Edge-cached so crawlers don't hit KV/D1 each time.
     if (request.method === "GET" && (url.pathname === "/status" || url.pathname.startsWith("/status/") || url.pathname === "/sitemap.xml" || url.pathname === "/llms.txt" || ["/privacy", "/about", "/support", "/mac", "/alerts"].includes(url.pathname))) {

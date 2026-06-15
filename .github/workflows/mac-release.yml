@@ -8,14 +8,16 @@ name: Release Mac
 # Manual-trigger only — you decide when a build ships. Version = MARKETING_VERSION
 # in mac/project.yml; build number = a UTC timestamp (fastlane).
 #
-# SETUP — five repo secrets (Settings → Secrets and variables → Actions). All
-# reusable from your other apps' Developer ID setup:
+# SETUP — six repo secrets (Settings → Secrets and variables → Actions). The
+# first five are reusable from your other apps' Developer ID setup:
 #   DEVID_CERT_P12_BASE64  base64 of your exported "Developer ID Application" .p12
 #   DEVID_CERT_PASSWORD    the password you set when exporting that .p12
 #   ASC_KEY_ID             App Store Connect API key id
 #   ASC_ISSUER_ID          App Store Connect issuer id (uuid)
 #   ASC_KEY_P8_BASE64      base64 of the AuthKey_*.p8 file
-# (Outage Observer needs NO provisioning profile — sandbox + network only.)
+#   SPARKLE_ED_PRIVATE_KEY the EdDSA private key that signs the auto-update feed
+# (Outage Observer needs NO provisioning profile — Developer ID + notarized,
+# NOT sandboxed, so Sparkle can self-update.)
 
 on:
   workflow_dispatch:
@@ -104,6 +106,32 @@ jobs:
           xcrun stapler validate "Outage-Observer.dmg"
           { echo "version=$VERSION"; echo "build=$BUILD"; } >> "$GITHUB_OUTPUT"
 
+      # Generate the signed Sparkle appcast from the FINAL notarized + stapled DMG
+      # (so the EdDSA signature covers the exact bytes users download). The feed
+      # is hosted on the rolling mac-latest release; outage.observer/appcast.xml
+      # redirects there. SPARKLE_ED_PRIVATE_KEY is the EdDSA key (repo secret),
+      # fed via stdin so it never lands on disk.
+      - name: Generate signed appcast
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/sparkle-dl" "$RUNNER_TEMP/sparkle-tools"
+          gh release download --repo sparkle-project/Sparkle --pattern 'Sparkle-*.tar.xz' --dir "$RUNNER_TEMP/sparkle-dl"
+          tar -xJf "$RUNNER_TEMP"/sparkle-dl/Sparkle-*.tar.xz -C "$RUNNER_TEMP/sparkle-tools"
+          GA="$RUNNER_TEMP/sparkle-tools/bin/generate_appcast"
+          STAGE="$RUNNER_TEMP/appcast-stage"
+          mkdir -p "$STAGE"
+          cp "Outage-Observer.dmg" "$STAGE/"
+          printf '%s' "$SPARKLE_ED_PRIVATE_KEY" | "$GA" \
+            --ed-key-file - \
+            --download-url-prefix "https://github.com/${{ github.repository }}/releases/download/mac-latest/" \
+            --link "https://outage.observer/mac" \
+            "$STAGE"
+          cp "$STAGE/appcast.xml" appcast.xml
+          echo "--- appcast.xml ---"; cat appcast.xml
+
       - name: Publish GitHub Release + deploy to mac-latest
         env:
           GH_TOKEN: ${{ github.token }}
@@ -117,7 +145,7 @@ jobs:
           PRE=""
           if [ "$PRERELEASE" = "true" ]; then PRE="--prerelease"; fi
           # 1) Immutable dated release, for history.
-          gh release create "$TAG" "Outage-Observer.dmg" --repo "$REPO" \
+          gh release create "$TAG" "Outage-Observer.dmg" "appcast.xml" --repo "$REPO" \
             --title "Outage Observer for Mac ${{ steps.pkg.outputs.version }} (${{ steps.pkg.outputs.build }})" \
             --notes "Notarized Developer ID build. Open the DMG and drag Outage Observer to Applications." \
             $PRE
@@ -127,6 +155,6 @@ jobs:
           #    old publish date so the repo front page reads "Latest · N days ago"
           #    and looks stale. Delete + recreate stamps it today.
           gh release delete mac-latest --repo "$REPO" --yes --cleanup-tag 2>/dev/null || true
-          gh release create mac-latest "Outage-Observer.dmg" --repo "$REPO" --latest --target "$GITHUB_SHA" \
+          gh release create mac-latest "Outage-Observer.dmg" "appcast.xml" --repo "$REPO" --latest --target "$GITHUB_SHA" \
             --title "Outage Observer for Mac" \
             --notes "The current Outage Observer for Mac build — notarized Developer ID, direct download."

@@ -34,5 +34,14 @@
   <string>.</string>
   <key>NSHumanReadableCopyright</key>
   <string>An Ekpani tool.</string>
+  <!-- Sparkle auto-update -->
+  <key>SUFeedURL</key>
+  <string>https://outage.observer/appcast.xml</string>
+  <key>SUPublicEDKey</key>
+  <string>YHShgQXAMS90LaQFAnwXDHe7g+qTEHWI33WUHWo7ZL0=</string>
+  <key>SUEnableAutomaticChecks</key>
+  <true/>
+  <key>SUScheduledCheckInterval</key>
+  <integer>21600</integer>
 </dict>
 </plist>
