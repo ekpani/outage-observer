@@ -27,7 +27,7 @@ struct MenuContentView: View {
         }
         .frame(width: popoverWidth)
         .background(Theme.bgSurface)
-        .preferredColorScheme(.dark)
+        .preferredColorScheme(store.colorSchemeOverride)
         .onAppear { if store.onboarded { Task { await store.refresh() } } }
     }
 

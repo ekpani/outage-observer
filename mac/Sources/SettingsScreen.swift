@@ -32,6 +32,19 @@ struct SettingsScreen: View {
                     }
                     .padding(.horizontal, 14).padding(.vertical, 9)
 
+                    group("Appearance")
+                    HStack {
+                        Text("Theme").font(.system(size: 13)).foregroundStyle(Theme.textPrimary)
+                        Spacer()
+                        Picker("", selection: $store.appearance) {
+                            Text("System").tag(Appearance.system)
+                            Text("Light").tag(Appearance.light)
+                            Text("Dark").tag(Appearance.dark)
+                        }
+                        .labelsHidden().frame(width: 110)
+                    }
+                    .padding(.horizontal, 14).padding(.vertical, 9)
+
                     group("Setup")
                     tapRow("Replay onboarding") { store.replayOnboarding() }
                     tapRow("Reset app…", destructive: true) { confirmReset = true }

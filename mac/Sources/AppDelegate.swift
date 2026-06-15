@@ -22,10 +22,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let pop = NSPopover()
         pop.behavior = .transient                 // closes on click-outside
         pop.animates = true
-        // The arrow/frame is system-drawn chrome (not our content). Force a dark
-        // appearance so it renders dark to match the popover body instead of the
-        // default light material showing through the stem.
-        pop.appearance = NSAppearance(named: .darkAqua)
+        // The arrow/frame is system-drawn chrome (not our content), so match its
+        // appearance to the user's theme choice (nil = follow system) — otherwise
+        // the default light material shows through the stem on a dark body.
+        pop.appearance = store.nsAppearance
         pop.contentSize = NSSize(width: popoverWidth, height: 520)
         pop.contentViewController = NSHostingController(
             rootView: MenuContentView().environmentObject(store)
@@ -44,7 +44,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // back on the next main-actor hop (by then it's current).
         store.objectWillChange
             .sink { [weak self] _ in
-                Task { @MainActor in self?.updateIcon() }
+                Task { @MainActor in
+                    guard let self else { return }
+                    self.updateIcon()
+                    self.popover?.appearance = self.store.nsAppearance
+                }
             }
             .store(in: &cancellables)
     }

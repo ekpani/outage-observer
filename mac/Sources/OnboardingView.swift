@@ -30,7 +30,6 @@ struct OnboardingView: View {
             }
         }
         .frame(height: 560)
-        .preferredColorScheme(.dark)
     }
 
     private var progressDots: some View {

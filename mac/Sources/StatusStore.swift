@@ -4,6 +4,9 @@ import SwiftUI
 /// Which screen the popover is showing (everything lives in the popover now).
 enum AppRoute { case board, browse, settings }
 
+/// Light/dark preference. `.system` follows the OS (the default).
+enum Appearance: String, CaseIterable { case system, light, dark }
+
 /// Single source of truth. Polls /api/status, holds the snapshot + the user's
 /// "observing" set, and fires notifications on transitions among observed
 /// services. @MainActor so all @Published mutations are on the main thread.
@@ -39,6 +42,22 @@ final class StatusStore: ObservableObject {
     @Published var interval: Double {
         didSet { UserDefaults.standard.set(interval, forKey: "interval"); startPolling() }
     }
+    @Published var appearance: Appearance {
+        didSet { UserDefaults.standard.set(appearance.rawValue, forKey: "appearance") }
+    }
+
+    /// SwiftUI override for the popover content (nil = follow system).
+    var colorSchemeOverride: ColorScheme? {
+        switch appearance { case .system: return nil; case .light: return .light; case .dark: return .dark }
+    }
+    /// AppKit appearance for the popover chrome / arrow (nil = follow system).
+    var nsAppearance: NSAppearance? {
+        switch appearance {
+        case .system: return nil
+        case .light: return NSAppearance(named: .aqua)
+        case .dark: return NSAppearance(named: .darkAqua)
+        }
+    }
 
     // In-popover navigation. Held on the singleton so the route/step survive the
     // popover being dismissed (click-away) and restored on reopen.
@@ -56,6 +75,7 @@ final class StatusStore: ObservableObject {
         // 30s matches the /api/status edge cache (s-maxage=30) — the freshness
         // floor; polling faster wouldn't return newer data.
         interval = (d.object(forKey: "interval") as? Double) ?? 30
+        appearance = Appearance(rawValue: d.string(forKey: "appearance") ?? "") ?? .system
 
         if onboarded { startPolling() }
     }
