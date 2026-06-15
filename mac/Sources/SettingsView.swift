@@ -3,6 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject var store: StatusStore
     @StateObject private var launch = LaunchAtLogin()
+    @State private var confirmReset = false
 
     var body: some View {
         Form {
@@ -16,6 +17,17 @@ struct SettingsView: View {
                     Text("1 minute").tag(60.0)
                     Text("5 minutes").tag(300.0)
                 }
+            }
+            Section("Setup") {
+                Button("Replay onboarding…") { store.replayOnboarding() }
+                Button("Reset app…", role: .destructive) { confirmReset = true }
+                    .confirmationDialog("Reset Outage Observer?",
+                                        isPresented: $confirmReset, titleVisibility: .visible) {
+                        Button("Reset everything", role: .destructive) { store.resetAll() }
+                        Button("Cancel", role: .cancel) {}
+                    } message: {
+                        Text("Clears the services you watch and your preferences, then restarts onboarding.")
+                    }
             }
             Section("About") {
                 LabeledContent("Version", value: appVersion)

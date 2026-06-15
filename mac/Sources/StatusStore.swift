@@ -21,7 +21,7 @@ final class StatusStore: ObservableObject {
     @Published var onboarded: Bool {
         didSet {
             UserDefaults.standard.set(onboarded, forKey: "didOnboard")
-            if onboarded { startPolling() }
+            startPolling()   // starts if onboarded, cancels the loop if not
         }
     }
     @Published var observing: Set<String> {
@@ -95,6 +95,23 @@ final class StatusStore: ObservableObject {
     func open(id: String) { NSWorkspace.shared.open(statusURL(for: id)) }
 
     func completeOnboarding() { onboarded = true }
+
+    /// Re-run onboarding, keeping current picks (they show pre-selected).
+    func replayOnboarding() {
+        onboarded = false
+        OnboardingController.shared.show()
+    }
+
+    /// Wipe everything back to a first-launch state and re-run onboarding.
+    func resetAll() {
+        observing = []
+        notificationsEnabled = true
+        interval = 30
+        lastLevels = [:]
+        snapshot = [:]
+        onboarded = false
+        OnboardingController.shared.show()
+    }
 
     // MARK: Polling (only while onboarded)
 
