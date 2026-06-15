@@ -32,9 +32,9 @@ struct MenuContentView: View {
             Text("outage.observer").font(.mono(13)).foregroundStyle(Theme.textSecondary)
             Spacer()
             if store.onboarded {
-                iconButton("arrow.clockwise") { Task { await store.refresh() } }
-                settingsButton
-                iconButton("macwindow") { openMain() }
+                iconButton("arrow.clockwise") { Task { await store.refresh() } }.help("Refresh now")
+                iconButton("plus") { openMain() }.help("Add or remove services")
+                settingsButton.help("Settings")
             }
         }
         .padding(.horizontal, 12).padding(.vertical, 10)
@@ -80,11 +80,7 @@ struct MenuContentView: View {
     }
 
     private var footer: some View {
-        HStack(spacing: 14) {
-            Button("Open board") { NSWorkspace.shared.open(URL(string: "https://outage.observer")!) }
-                .buttonStyle(.plain).font(.mono(11)).foregroundStyle(Theme.textSecondary)
-            Button("Manage…") { openMain() }
-                .buttonStyle(.plain).font(.mono(11)).foregroundStyle(Theme.textSecondary)
+        HStack {
             Spacer()
             Button("Quit") { NSApp.terminate(nil) }
                 .buttonStyle(.plain).font(.mono(11)).foregroundStyle(Theme.textMuted)
