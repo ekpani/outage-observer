@@ -127,16 +127,3 @@ struct RadarView: View {
         .frame(width: size, height: size)
     }
 }
-
-/// Menu-bar icon. A reticle symbol tinted by the worst observed status (green
-/// when all clear, amber/red when something's wrong). Using an explicit
-/// saturated colour keeps it visible on BOTH light and dark menu bars — a
-/// custom shape with `Color.primary` renders white and vanishes on a light bar.
-struct MenuBarLabel: View {
-    let worst: Level
-    var body: some View {
-        Image(systemName: "dot.scope")
-            .symbolRenderingMode(.monochrome)
-            .foregroundStyle(Theme.status(worst))
-    }
-}
