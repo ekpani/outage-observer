@@ -63,6 +63,11 @@ struct MenuContentView: View {
             }
             .frame(maxWidth: .infinity).padding(.vertical, 24)
         } else {
+            // A ScrollView has no intrinsic height; inside the self-sizing
+            // MenuBarExtra window it collapses to 0 (the rows vanish). Give it a
+            // definite height — sized to the rows, capped so long lists scroll.
+            let rowH: CGFloat = 36
+            let height = min(CGFloat(store.observedProviders.count) * rowH, 396)
             ScrollView {
                 VStack(spacing: 0) {
                     ForEach(store.observedProviders) { p in
@@ -70,7 +75,7 @@ struct MenuContentView: View {
                     }
                 }
             }
-            .frame(maxHeight: 360)
+            .frame(height: height)
         }
     }
 
