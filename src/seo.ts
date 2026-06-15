@@ -79,6 +79,7 @@ function shell(opts: { title: string; description: string; canonical: string; js
 ${ld}
 </head>
 <body>
+<div class="radar" aria-hidden="true"><div class="radar-sweep"></div></div>
 <div class="sp-wrap">
 <header class="sp-head">
   <a class="sp-brand" href="/">
@@ -93,7 +94,7 @@ ${ld}
 </header>
 ${opts.body}
 <footer class="sp-foot">
-  <a href="/status">All providers</a> · <a href="/feed.xml">RSS</a> · <a href="https://t.me/outageobserverbot" target="_blank" rel="noopener noreferrer">Telegram</a><br/>
+  <a href="/about">about</a> · <a href="/mac">mac</a> · <a href="/alerts">alerts</a><br/>
   <a href="https://ekpani.com" target="_blank" rel="noopener noreferrer">an ekpani tool</a>
 </footer>
 </div>
@@ -271,6 +272,11 @@ export async function renderSitemap(env: Env): Promise<string> {
   const urls = [
     { loc: SITE + "/", priority: "1.0", freq: "always" },
     { loc: SITE + "/status", priority: "0.9", freq: "hourly" },
+    { loc: SITE + "/alerts", priority: "0.7", freq: "monthly" },
+    { loc: SITE + "/mac", priority: "0.7", freq: "monthly" },
+    { loc: SITE + "/about", priority: "0.5", freq: "monthly" },
+    { loc: SITE + "/support", priority: "0.6", freq: "monthly" },
+    { loc: SITE + "/privacy", priority: "0.3", freq: "yearly" },
     ...CATALOG.map((p) => ({ loc: `${SITE}/status/${p.id}`, priority: "0.7", freq: "hourly" })),
   ];
   const body = urls.map((u) =>
@@ -340,7 +346,252 @@ export async function handleSeo(env: Env, url: URL): Promise<Response | null> {
     });
   }
   if (path === "/privacy") return html(renderPrivacy());
+  if (path === "/about") return html(renderAbout());
+  if (path === "/support") return html(renderSupport());
+  if (path === "/mac") return html(renderMac());
+  if (path === "/alerts") return html(renderAlerts());
   return null;
+}
+
+const EKPANI = "https://ekpani.com";
+const REPO = "https://github.com/ekpani/outage-observer";
+const RELEASES = REPO + "/releases/latest";
+
+function crumbLd(trail: { name: string; path: string }[]): object {
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: trail.map((t, i) => ({
+      "@type": "ListItem", position: i + 1, name: t.name, item: SITE + t.path,
+    })),
+  };
+}
+
+// ---- /about ----
+function renderAbout(): string {
+  const body = `<nav class="sp-crumbs" aria-label="Breadcrumb"><a href="/">Home</a> / <span>About</span></nav>
+<main class="sp-main">
+  <h1>About Outage Observer</h1>
+  <p class="sp-answer">A calm pane of glass for the services your product runs on, and a ping the moment one of them breaks.</p>
+  <section>
+    <h2>The idea</h2>
+    <p>Modern software leans on dozens of providers: cloud, AI, payments, auth, CDNs. Each publishes its own status page, and nobody has time to keep ${CATALOG.length} tabs open. Outage Observer watches them all in one place, lets you pick the handful you actually depend on, and tells you the instant one changes state. It stays quiet the rest of the time.</p>
+  </section>
+  <section>
+    <h2>How it's built</h2>
+    <p>One small service checks each provider's official status source every minute and reacts only to real changes. Failed checks keep the last known status rather than inventing a scare, so it never cries wolf. It's free, needs no account, and stores your chosen services on your own device. The whole thing runs at the edge.</p>
+  </section>
+  <section>
+    <h2>Who makes it</h2>
+    <p>Outage Observer is built by <a href="${EKPANI}" target="_blank" rel="noopener noreferrer">Ekpani</a>, a small studio. The source is <a href="${REPO}" target="_blank" rel="noopener noreferrer">on GitHub</a>.</p>
+  </section>
+  <section>
+    <h2>More</h2>
+    <ul class="sp-related">
+      <li><a href="/alerts">Get alerts</a></li>
+      <li><a href="/mac">Mac app</a></li>
+      <li><a href="/support">Support &amp; FAQ</a></li>
+      <li><a href="/status">All ${CATALOG.length} providers</a></li>
+      <li><a href="/privacy">Privacy</a></li>
+    </ul>
+  </section>
+</main>`;
+  return shell({
+    title: "About · Outage Observer",
+    description: `Outage Observer watches the official status pages of ${CATALOG.length}+ infrastructure and AI providers and alerts you the moment one you depend on changes state. Free, no login. Built by Ekpani.`,
+    canonical: SITE + "/about",
+    jsonld: [
+      crumbLd([{ name: "Home", path: "/" }, { name: "About", path: "/about" }]),
+      {
+        "@context": "https://schema.org",
+        "@type": "AboutPage",
+        name: "About Outage Observer",
+        url: SITE + "/about",
+        publisher: { "@type": "Organization", name: "Ekpani", url: EKPANI },
+      },
+    ],
+    body,
+  });
+}
+
+// ---- /support (FAQPage — strong for AEO) ----
+const FAQS: { q: string; a: string }[] = [
+  { q: "Is Outage Observer free?", a: "Yes. The web board, the Telegram bot, browser push, Slack/Discord, and RSS are all free, with no account required." },
+  { q: "How fast are alerts?", a: "Outage Observer checks each provider's official status source about once a minute and notifies you on the next change, so alerts typically arrive within a minute or two of a provider updating its own status page." },
+  { q: "Does it work for the services I use?", a: `It watches ${CATALOG.length}+ providers across cloud, AI, dev tools, data, payments, comms, auth, CDNs, and more. Browse the full list on the status directory and pick the ones you depend on.` },
+  { q: "Will I get false alarms?", a: "It's designed not to. A failed check keeps the last known status rather than reporting a scare, routine maintenance noise is filtered, and alerts only fire on real state changes from the provider's own feed." },
+  { q: "How do I get notified?", a: "Pick a channel on the alerts page: browser push, the Telegram bot, a Slack or Discord webhook, or an RSS feed. The Mac app adds a menu-bar indicator and native notifications." },
+  { q: "Do you collect my data?", a: "No. There are no accounts and no tracking. Your chosen services are stored on your own device. See the privacy page for details." },
+  { q: "Is there a Mac app?", a: "Yes — a native menu-bar app with notifications. See the Mac page to download it." },
+  { q: "How do I add a service that isn't listed?", a: "Email hi@ekpani.com with the provider and its status page URL and we'll look at adding it." },
+];
+
+function renderSupport(): string {
+  const faqHtml = FAQS.map((f) =>
+    `<section><h2>${esc(f.q)}</h2><p>${esc(f.a)}</p></section>`,
+  ).join("\n");
+  const body = `<nav class="sp-crumbs" aria-label="Breadcrumb"><a href="/">Home</a> / <span>Support</span></nav>
+<main class="sp-main">
+  <h1>Support</h1>
+  <p class="sp-answer">Questions, requests, or a provider we should add? Email <a href="mailto:hi@ekpani.com">hi@ekpani.com</a>.</p>
+  ${faqHtml}
+  <section>
+    <h2>Still stuck?</h2>
+    <p>Reach us at <a href="mailto:hi@ekpani.com">hi@ekpani.com</a> or open an issue <a href="${REPO}/issues" target="_blank" rel="noopener noreferrer">on GitHub</a>.</p>
+  </section>
+</main>`;
+  return shell({
+    title: "Support & FAQ · Outage Observer",
+    description: "Answers to common questions about Outage Observer: pricing, alert speed, supported providers, privacy, the Mac app, and how to request a service. Email hi@ekpani.com.",
+    canonical: SITE + "/support",
+    jsonld: [
+      crumbLd([{ name: "Home", path: "/" }, { name: "Support", path: "/support" }]),
+      {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        mainEntity: FAQS.map((f) => ({
+          "@type": "Question",
+          name: f.q,
+          acceptedAnswer: { "@type": "Answer", text: f.a },
+        })),
+      },
+    ],
+    body,
+  });
+}
+
+// A faithful CSS mockup of the menu-bar popover (not a screenshot), grounded in
+// how the app actually renders: aperture + wordmark + action icons, a scoped
+// status line, observed rows worst-first, and Quit.
+function macMock(): string {
+  const col = (l: Level) => `var(--oo-status-${l}-fg)`;
+  const row = (name: string, level: Level) =>
+    `<div class="mk-row"><span class="mk-dot" style="background:${col(level)}"></span>` +
+    `<span class="mk-name">${esc(name)}</span>` +
+    `<span class="mk-stat" style="color:${col(level)}">${LABEL[level]}</span></div>`;
+  return `<div class="mac-mock" role="img" aria-label="The Outage Observer menu-bar popover showing watched services">
+    <div class="mk-head">
+      <span class="mk-aperture"></span>
+      <span class="mk-word">outage<span class="mk-dotsep">.</span>observer</span>
+      <span class="mk-icons" aria-hidden="true"></span>
+    </div>
+    <div class="mk-status"><span class="mk-dot" style="background:${col("maintenance")}"></span><span style="color:${col("maintenance")}">1 needs attention</span><span class="mk-checked">checked 12:41 UTC</span></div>
+    ${row("Cloudflare", "maintenance")}
+    ${row("Amazon Web Services", "operational")}
+    ${row("OpenAI", "operational")}
+    ${row("Stripe", "operational")}
+    ${row("GitHub", "operational")}
+    <div class="mk-foot">Quit</div>
+  </div>`;
+}
+
+// ---- /mac ----
+function renderMac(): string {
+  const body = `<nav class="sp-crumbs" aria-label="Breadcrumb"><a href="/">Home</a> / <span>Mac app</span></nav>
+<main class="sp-main">
+  <h1>Outage Observer for Mac</h1>
+  <p class="sp-answer">A native menu-bar app. A quiet reticle that glows when something you watch has trouble, and a notification the moment it does.</p>
+  <p class="sp-meta"><a class="sp-download" href="${RELEASES}" target="_blank" rel="noopener noreferrer">Download for macOS →</a> · free · macOS 14+</p>
+
+  ${macMock()}
+
+  <section>
+    <h2>What it does</h2>
+    <ul class="sp-related sp-stack">
+      <li><strong>Lives in your menu bar.</strong> A reticle that's black or white to match your bar, with a colored pupil when a service you watch needs attention.</li>
+      <li><strong>Notifies you instantly.</strong> A native notification (with a tasteful sound) the moment a watched service changes state, and silence otherwise.</li>
+      <li><strong>Your board, one click away.</strong> Click the icon to see the services you watch, problems pinned to the top.</li>
+      <li><strong>Private and native.</strong> No account, no tracking; it just reads the public status feed. Light or dark, follows your Mac.</li>
+    </ul>
+  </section>
+  <section>
+    <h2>Installing</h2>
+    <p>Download the latest build from <a href="${RELEASES}" target="_blank" rel="noopener noreferrer">GitHub releases</a> and drag it to Applications. A Mac App Store release is on the way; in the meantime, if macOS warns on first launch, right-click the app and choose <em>Open</em>.</p>
+  </section>
+  <section>
+    <h2>More</h2>
+    <ul class="sp-related">
+      <li><a href="/alerts">Other ways to get alerts</a></li>
+      <li><a href="/">Live board</a></li>
+      <li><a href="${REPO}" target="_blank" rel="noopener noreferrer">Source on GitHub</a></li>
+    </ul>
+  </section>
+</main>`;
+  return shell({
+    title: "Mac app · Outage Observer",
+    description: "Outage Observer for Mac: a native menu-bar app with notifications the moment a service you depend on changes state. Free, macOS 14+, no account.",
+    canonical: SITE + "/mac",
+    jsonld: [
+      crumbLd([{ name: "Home", path: "/" }, { name: "Mac app", path: "/mac" }]),
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        name: "Outage Observer for Mac",
+        operatingSystem: "macOS 14.0",
+        applicationCategory: "DeveloperApplication",
+        offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+        url: SITE + "/mac",
+        downloadUrl: RELEASES,
+        publisher: { "@type": "Organization", name: "Ekpani", url: EKPANI },
+      },
+    ],
+    body,
+  });
+}
+
+// ---- /alerts ----
+function renderAlerts(): string {
+  const body = `<nav class="sp-crumbs" aria-label="Breadcrumb"><a href="/">Home</a> / <span>Alerts</span></nav>
+<main class="sp-main">
+  <h1>Get alerted</h1>
+  <p class="sp-answer">Pick how you want to hear about it. Outage Observer pings you only for the services you choose, only when they change.</p>
+
+  <section>
+    <h2>🔔 Browser push</h2>
+    <p>The fastest way. On the <a href="/">live board</a>, pick your services and enable browser notifications. They arrive even when the tab is closed. Works in Chrome, Edge, Firefox, and Safari (on iPhone, add the board to your Home Screen first).</p>
+  </section>
+  <section>
+    <h2>🖥 Mac app</h2>
+    <p>A native menu-bar app with notifications and a status reticle. <a href="/mac">Get the Mac app →</a></p>
+  </section>
+  <section>
+    <h2>💬 Telegram</h2>
+    <p>Message <a href="https://t.me/outageobserverbot" target="_blank" rel="noopener noreferrer">@outageobserverbot</a>, search and pick your services, and it pings you on every change. Commands: <span class="mono">/start</span>, <span class="mono">/status</span>, <span class="mono">/stop</span>.</p>
+  </section>
+  <section>
+    <h2>🧩 Slack &amp; Discord</h2>
+    <p>Post changes into a channel. In Slack or Discord, create an incoming webhook for the channel, then paste its URL into the “Get alerts” panel on the <a href="/">board</a>. Updates for your chosen services land in the channel automatically.</p>
+  </section>
+  <section>
+    <h2>📡 RSS / Atom</h2>
+    <p>Wire it into your own pipeline. There's a feed for everything, a feed per provider, and a feed for your stack.</p>
+    <ul class="sp-related sp-stack">
+      <li><a href="/feed.xml">/feed.xml</a> — every recent change</li>
+      <li><a href="/feed/stripe.xml">/feed/&lt;provider&gt;.xml</a> — one provider</li>
+      <li><span class="mono">/feed.xml?ids=aws,openai,stripe</span> — just your stack</li>
+    </ul>
+  </section>
+  <section>
+    <h2>The promise</h2>
+    <p>Every channel follows the same rule: alerts fire only on real state changes from a provider's own status feed. Failed checks keep the last known status, so you'll never get a false alarm.</p>
+  </section>
+</main>`;
+  return shell({
+    title: "Get alerts · Outage Observer",
+    description: "Ways to get notified when a service you depend on changes state: browser push, the Mac app, Telegram, Slack/Discord webhooks, and RSS/Atom feeds. Free, no account.",
+    canonical: SITE + "/alerts",
+    jsonld: [
+      crumbLd([{ name: "Home", path: "/" }, { name: "Alerts", path: "/alerts" }]),
+      {
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        name: "Get alerted with Outage Observer",
+        url: SITE + "/alerts",
+        isPartOf: { "@type": "WebSite", name: "Outage Observer", url: SITE + "/" },
+      },
+    ],
+    body,
+  });
 }
 
 /** Privacy policy — required for App Store Connect. Outage Observer collects no
@@ -371,7 +622,16 @@ function renderPrivacy(): string {
     title: "Privacy · Outage Observer",
     description: "Outage Observer collects no personal data. No accounts, no analytics, no tracking.",
     canonical: SITE + "/privacy",
-    jsonld: [],
+    jsonld: [
+      crumbLd([{ name: "Home", path: "/" }, { name: "Privacy", path: "/privacy" }]),
+      {
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        name: "Privacy",
+        url: SITE + "/privacy",
+        isPartOf: { "@type": "WebSite", name: "Outage Observer", url: SITE + "/" },
+      },
+    ],
     body,
   });
 }

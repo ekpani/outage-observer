@@ -152,3 +152,73 @@
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; }
 }
+
+/* ===========================================================================
+   Background radar scope (decorative, shared by every page). A fixed full-
+   viewport layer painted behind all content (z-index -1, above the page bg but
+   below content), so content is never obstructed. Origin is off-center (lower-
+   right, like the OG card); the rings + sweep span the screen from there and
+   fade near the far corner. Tied to the operational green, faint, and frozen by
+   the reduced-motion rule above. Markup: <div class="radar"><div class="radar-sweep"></div></div>
+   =========================================================================== */
+.radar {
+  /* Light theme (default): the operational green is dark, so it needs more
+     opacity to read on the light page. Dark theme overrides below. */
+  --radar-line: color-mix(in srgb, var(--oo-status-operational-fg) 17%, transparent);
+  --radar-sweep: color-mix(in srgb, var(--oo-status-operational-fg) 26%, transparent);
+  --radar-pupil: color-mix(in srgb, var(--oo-status-operational-fg) 40%, transparent);
+  --ox: 84%;   /* origin: lower-right beacon */
+  --oy: 78%;
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at var(--ox) var(--oy), var(--radar-pupil) 0, transparent 2.4vmax),
+    repeating-radial-gradient(circle at var(--ox) var(--oy), var(--radar-line) 0 1px, transparent 1px 5.5vmax);
+  -webkit-mask: radial-gradient(circle at var(--ox) var(--oy), #000 0%, #000 64%, transparent 100%);
+  mask: radial-gradient(circle at var(--ox) var(--oy), #000 0%, #000 64%, transparent 100%);
+}
+.radar-sweep {
+  position: absolute;
+  left: var(--ox);
+  top: var(--oy);
+  width: 300vmax;
+  height: 300vmax;
+  margin-left: -150vmax;
+  margin-top: -150vmax;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg,
+    var(--radar-sweep) 0deg,
+    color-mix(in srgb, var(--radar-sweep) 35%, transparent) 18deg,
+    transparent 50deg,
+    transparent 360deg);
+  -webkit-mask: radial-gradient(circle at center, #000 0, #000 18vmax, transparent 78vmax);
+  mask: radial-gradient(circle at center, #000 0, #000 18vmax, transparent 78vmax);
+  animation: radar-spin 11s linear infinite;
+}
+@keyframes radar-spin { to { transform: rotate(360deg); } }
+/* Dark theme: the green is bright on near-black, so it needs much less opacity. */
+:root[data-theme="dark"] .radar {
+  --radar-line: color-mix(in srgb, var(--oo-status-operational-fg) 8%, transparent);
+  --radar-sweep: color-mix(in srgb, var(--oo-status-operational-fg) 15%, transparent);
+  --radar-pupil: color-mix(in srgb, var(--oo-status-operational-fg) 26%, transparent);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .radar {
+    --radar-line: color-mix(in srgb, var(--oo-status-operational-fg) 8%, transparent);
+    --radar-sweep: color-mix(in srgb, var(--oo-status-operational-fg) 15%, transparent);
+    --radar-pupil: color-mix(in srgb, var(--oo-status-operational-fg) 26%, transparent);
+  }
+}
+@media (max-width: 600px) {
+  .radar {
+    -webkit-mask: radial-gradient(circle at var(--ox) var(--oy), #000 0%, #000 74%, transparent 100%);
+    mask: radial-gradient(circle at var(--ox) var(--oy), #000 0%, #000 74%, transparent 100%);
+  }
+  .radar-sweep {
+    -webkit-mask: radial-gradient(circle at center, #000 0, #000 26vmax, transparent 96vmax);
+    mask: radial-gradient(circle at center, #000 0, #000 26vmax, transparent 96vmax);
+  }
+}

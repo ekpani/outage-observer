@@ -78,3 +78,50 @@ a.inc-name:hover { color: var(--oo-accent); }
   .sp-answer { font-size: var(--oo-text-lg); }
   .sp-dir { grid-template-columns: 1fr; }
 }
+
+/* ---- /mac, /alerts, /about, /support shared bits ---- */
+.sp-download {
+  display: inline-block; font-family: var(--oo-font-sans); font-weight: var(--oo-weight-semibold);
+  color: var(--oo-accent-fg); background: var(--oo-accent);
+  padding: 9px 16px; border-radius: var(--oo-radius-md); text-decoration: none;
+}
+.sp-download:hover { background: var(--oo-accent-hover); text-decoration: none; }
+.sp-related.sp-stack { display: block; }
+.sp-related.sp-stack li { display: list-item; list-style: none; margin: 0 0 10px; padding-left: 0; color: var(--oo-text-secondary); }
+.sp-related.sp-stack li strong { color: var(--oo-text-primary); }
+
+/* ---- Mac popover mockup (faithful recreation, not a screenshot) ---- */
+.mac-mock {
+  width: 320px; max-width: 100%; margin: 28px 0 8px;
+  background: var(--oo-bg-surface); border: 1px solid var(--oo-border-strong);
+  border-radius: var(--oo-radius-xl); overflow: hidden; box-shadow: var(--oo-shadow-md);
+  font-family: var(--oo-font-mono); letter-spacing: var(--oo-tracking-mono);
+}
+.mac-mock .mk-head, .mac-mock .mk-status, .mac-mock .mk-row, .mac-mock .mk-foot {
+  display: flex; align-items: center; gap: 10px; padding: 11px 14px;
+  border-bottom: 1px solid var(--oo-border);
+}
+.mac-mock .mk-foot { border-bottom: none; justify-content: flex-end; color: var(--oo-text-muted); font-size: 12px; }
+.mac-mock .mk-word { font-size: 13px; color: var(--oo-text-secondary); }
+.mac-mock .mk-dotsep { color: var(--oo-text-muted); }
+.mac-mock .mk-icons { margin-left: auto; width: 54px; height: 12px; }
+.mac-mock .mk-icons::after {
+  content: ""; display: block; height: 100%;
+  background:
+    radial-gradient(circle at 8px 6px, var(--oo-text-muted) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 27px 6px, var(--oo-text-muted) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 46px 6px, var(--oo-text-muted) 0 1px, transparent 1.5px);
+}
+.mac-mock .mk-aperture {
+  width: 16px; height: 16px; border-radius: 50%; flex: none;
+  border: 2px solid var(--oo-text-secondary); position: relative;
+}
+.mac-mock .mk-aperture::after {
+  content: ""; position: absolute; inset: 4px; border-radius: 50%; background: var(--oo-accent);
+}
+.mac-mock .mk-status { font-size: 12px; }
+.mac-mock .mk-checked { margin-left: auto; color: var(--oo-text-muted); font-size: 10px; }
+.mac-mock .mk-row { font-size: 13px; }
+.mac-mock .mk-dot { width: 9px; height: 9px; border-radius: 999px; flex: none; }
+.mac-mock .mk-name { color: var(--oo-text-primary); }
+.mac-mock .mk-stat { margin-left: auto; font-family: var(--oo-font-sans); font-size: 11px; font-weight: var(--oo-weight-medium); }

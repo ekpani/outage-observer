@@ -286,16 +286,19 @@ document.addEventListener("click", (e) => {
     saveStack(stack);
     render();           // stay in the picker so you can add several
     syncPushIfEnabled();
+    maybeAutoPromptPush();   // first board -> offer browser alerts (this click is the gesture)
     return;
   }
   const pin = e.target.closest(".pin");
   if (pin) {
     const id = pin.dataset.id;
     const stack = getStack();
-    if (stack.has(id)) stack.delete(id); else stack.add(id);
+    const added = !stack.has(id);
+    if (added) stack.add(id); else stack.delete(id);
     saveStack(stack);
     render();
     syncPushIfEnabled();
+    if (added) maybeAutoPromptPush();
     return;
   }
   if (e.target.closest("#theme")) toggleTheme();
@@ -338,6 +341,21 @@ if (hookBtn) hookBtn.addEventListener("click", connectWebhook);
 // ---- Web Push ----
 function pushSupported() {
   return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+}
+// First time someone builds a board, offer browser alerts (once). Called from a
+// click handler so the permission prompt counts as a user gesture. Only fires
+// when permission hasn't been decided yet, so it's never naggy.
+const PUSH_PROMPTED_KEY = "oo-push-prompted";
+function maybeAutoPromptPush() {
+  try {
+    if (localStorage.getItem(PUSH_PROMPTED_KEY)) return;
+    if (!pushSupported() || typeof Notification === "undefined") return;
+    if (getStack().size < 1) return;
+    localStorage.setItem(PUSH_PROMPTED_KEY, "1");   // only ever once
+    if (Notification.permission !== "default") return;   // already granted/denied
+    if (localStorage.getItem(PUSH_ON_KEY) === "1") return;
+    enablePush();
+  } catch {}
 }
 function urlB64ToU8(base64) {
   const padding = "=".repeat((4 - (base64.length % 4)) % 4);
