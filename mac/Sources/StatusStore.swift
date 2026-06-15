@@ -27,7 +27,7 @@ final class StatusStore: ObservableObject {
     }
 
     private var lastLevels: [String: Level] = [:]
-    private var timer: Timer?
+    private var pollTask: Task<Void, Never>?
 
     private init() {
         let d = UserDefaults.standard
@@ -40,8 +40,7 @@ final class StatusStore: ObservableObject {
         interval = (d.object(forKey: "interval") as? Double) ?? 60
 
         // Notification permission is requested contextually during onboarding,
-        // not cold on launch.
-        Task { await refresh() }
+        // not cold on launch. The poll loop does an immediate first refresh.
         restartTimer()
     }
 
@@ -82,9 +81,15 @@ final class StatusStore: ObservableObject {
     // MARK: Polling
 
     func restartTimer() {
-        timer?.invalidate()
-        timer = Timer.scheduledTimer(withTimeInterval: max(15, interval), repeats: true) { [weak self] _ in
-            Task { await self?.refresh() }
+        // Created inside this @MainActor method, so the task runs on the main
+        // actor — no Sendable gymnastics, and self access stays isolated.
+        pollTask?.cancel()
+        pollTask = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let self else { return }
+                await self.refresh()
+                try? await Task.sleep(for: .seconds(max(15, self.interval)))
+            }
         }
     }
 

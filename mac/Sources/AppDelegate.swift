@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 
+@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         if !UserDefaults.standard.bool(forKey: "didOnboard") {
@@ -11,6 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 /// Presents the first-run onboarding in its own borderless dark window (a
 /// menu-bar agent has no main window to host it in).
+@MainActor
 final class OnboardingController {
     static let shared = OnboardingController()
     private var window: NSWindow?

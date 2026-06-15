@@ -4,7 +4,9 @@ import UserNotifications
 /// Local notifications on real status transitions. The app polls /api/status and
 /// fires here when a service the user observes changes state. Clicking opens the
 /// provider's Outage Observer page.
-final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
+// Stateless singleton (just methods), so it's safe to share across isolation
+// domains; completions are delivered on the main actor.
+final class NotificationManager: NSObject, UNUserNotificationCenterDelegate, @unchecked Sendable {
     static let shared = NotificationManager()
 
     private override init() {
@@ -12,15 +14,16 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
         UNUserNotificationCenter.current().delegate = self
     }
 
-    func requestAuthorization(_ completion: @escaping (Bool) -> Void = { _ in }) {
+    func requestAuthorization(_ completion: @escaping @MainActor (Bool) -> Void = { _ in }) {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, _ in
-            DispatchQueue.main.async { completion(granted) }
+            Task { @MainActor in completion(granted) }
         }
     }
 
-    func isAuthorized(_ completion: @escaping (Bool) -> Void) {
+    func isAuthorized(_ completion: @escaping @MainActor (Bool) -> Void) {
         UNUserNotificationCenter.current().getNotificationSettings { settings in
-            DispatchQueue.main.async { completion(settings.authorizationStatus == .authorized) }
+            let authorized = settings.authorizationStatus == .authorized
+            Task { @MainActor in completion(authorized) }
         }
     }
 
@@ -50,7 +53,7 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
                                 didReceive response: UNNotificationResponse,
                                 withCompletionHandler completionHandler: @escaping () -> Void) {
         if let s = response.notification.request.content.userInfo["url"] as? String, let url = URL(string: s) {
-            DispatchQueue.main.async { NSWorkspace.shared.open(url) }
+            Task { @MainActor in NSWorkspace.shared.open(url) }
         }
         completionHandler()
     }
