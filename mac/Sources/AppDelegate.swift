@@ -3,38 +3,6 @@ import SwiftUI
 import Combine
 import CoreText
 
-/// A scope reticle drawn with a high-contrast `ring` (so it's legible on any
-/// menu bar) and a status-coloured `pupil`. Mirrors the SF Symbol "dot.scope".
-private func reticleImage(ring: NSColor, pupil: NSColor, size: CGFloat = 18) -> NSImage {
-    let img = NSImage(size: NSSize(width: size, height: size))
-    img.lockFocus()
-    let c = NSPoint(x: size / 2, y: size / 2)
-    let r = size * 0.34
-
-    ring.setStroke()
-    let circle = NSBezierPath(ovalIn: NSRect(x: c.x - r, y: c.y - r, width: 2 * r, height: 2 * r))
-    circle.lineWidth = 1.5
-    circle.stroke()
-
-    let ticks = NSBezierPath()
-    ticks.lineWidth = 1.5
-    let t0 = r + 0.8, t1 = r + 2.8
-    for (dx, dy) in [(0.0, 1.0), (0.0, -1.0), (1.0, 0.0), (-1.0, 0.0)] {
-        ticks.move(to: NSPoint(x: c.x + dx * t0, y: c.y + dy * t0))
-        ticks.line(to: NSPoint(x: c.x + dx * t1, y: c.y + dy * t1))
-    }
-    ring.setStroke()
-    ticks.stroke()
-
-    pupil.setFill()
-    let pr = size * 0.13
-    NSBezierPath(ovalIn: NSRect(x: c.x - pr, y: c.y - pr, width: 2 * pr, height: 2 * pr)).fill()
-
-    img.unlockFocus()
-    img.isTemplate = false
-    return img
-}
-
 /// Owns the menu-bar status item and the popover. We use AppKit's NSStatusItem +
 /// NSPopover (rather than SwiftUI's MenuBarExtra) so the popover shows the
 /// standard arrow that stems from the icon and anchors centered beneath it.
@@ -43,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let store = StatusStore.shared
     private var statusItem: NSStatusItem?
     private var popover: NSPopover?
+    private var pupilLayer: CALayer?
     private var cancellables = Set<AnyCancellable>()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -116,22 +85,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard let button = statusItem?.button else { return }
         button.contentTintColor = nil
 
+        // The scope is a TEMPLATE image, so the system colours it to match every
+        // other menu-bar icon — black on a light (wallpaper-driven) bar, white on
+        // a dark one. (effectiveAppearance can't tell us this; only template
+        // rendering tracks the wallpaper.) The status colour rides on top as a
+        // separate layer over the scope's centre, so the ring always adapts.
+        let cfg = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
+        let base = NSImage(systemSymbolName: "dot.scope", accessibilityDescription: "Outage Observer")?
+            .withSymbolConfiguration(cfg)
+        base?.isTemplate = true
+        button.image = base
+
+        let dot = ensurePupilLayer(on: button)
         if let tint = menuBarTint(store.worst) {
-            // Attention: a high-contrast ring (white on a dark bar, black on a
-            // light bar) keeps it legible on any wallpaper; the pupil carries the
-            // status colour. Re-read on every poll, so it self-corrects if the
-            // bar's light/dark changes.
-            let dark = button.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-            button.image = reticleImage(ring: dark ? .white : .black, pupil: tint)
+            let s: CGFloat = 5
+            dot.frame = CGRect(x: button.bounds.midX - s / 2, y: button.bounds.midY - s / 2, width: s, height: s)
+            dot.cornerRadius = s / 2
+            dot.backgroundColor = tint.cgColor
+            dot.isHidden = false
         } else {
-            // All clear: plain template — the system renders it white on dark,
-            // black on light, always visible.
-            let cfg = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
-            let base = NSImage(systemSymbolName: "dot.scope", accessibilityDescription: "Outage Observer")?
-                .withSymbolConfiguration(cfg)
-            base?.isTemplate = true
-            button.image = base
+            dot.isHidden = true
         }
+    }
+
+    private func ensurePupilLayer(on button: NSStatusBarButton) -> CALayer {
+        button.wantsLayer = true
+        if let layer = pupilLayer, layer.superlayer != nil { return layer }
+        let layer = CALayer()
+        layer.isHidden = true
+        button.layer?.addSublayer(layer)
+        pupilLayer = layer
+        return layer
     }
 
     private func menuBarTint(_ level: Level) -> NSColor? {
