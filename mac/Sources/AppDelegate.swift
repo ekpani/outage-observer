@@ -22,6 +22,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let pop = NSPopover()
         pop.behavior = .transient                 // closes on click-outside
         pop.animates = true
+        // The arrow/frame is system-drawn chrome (not our content). Force a dark
+        // appearance so it renders dark to match the popover body instead of the
+        // default light material showing through the stem.
+        pop.appearance = NSAppearance(named: .darkAqua)
         pop.contentSize = NSSize(width: popoverWidth, height: 520)
         pop.contentViewController = NSHostingController(
             rootView: MenuContentView().environmentObject(store)
