@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// The full window: what you're observing, plus the whole catalog to add from.
+/// The "Manage" window: what you're observing, plus the whole catalog to add
+/// from. Catalog-backed (instant), with live status overlaid from the snapshot.
 struct BoardWindowView: View {
     @EnvironmentObject var store: StatusStore
     @State private var query = ""
@@ -27,7 +28,7 @@ struct BoardWindowView: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text("Outage Observer").font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.textPrimary)
                 Text(store.attentionCount == 0 ? "all clear" : "\(store.attentionCount) need attention")
-                    .font(.mono(10)).foregroundStyle(Theme.textMuted)
+                    .font(.mono(10)).foregroundStyle(store.attentionCount == 0 ? Theme.textMuted : Theme.status(store.worst))
             }
             Spacer()
             TextField("Search…", text: $query)
@@ -48,6 +49,7 @@ struct BoardWindowView: View {
             sectionHeader("Observing", store.observedProviders.count)
             ForEach(store.observedProviders) { p in
                 ProviderRow(provider: p, showToggle: true, observing: true,
+                            liveLevel: store.level(for: p.id),
                             onToggle: { store.toggle(p.id) }, onOpen: { store.open(p) })
             }
         }
@@ -58,17 +60,22 @@ struct BoardWindowView: View {
             let items = filtered(cat)
             if !items.isEmpty {
                 sectionHeader(cat, items.count)
-                ForEach(items) { p in
-                    ProviderRow(provider: p, showToggle: true, observing: store.isObserving(p.id),
-                                onToggle: { store.toggle(p.id) }, onOpen: { store.open(p) })
+                ForEach(items) { e in
+                    ProviderRow(provider: providerFor(e), showToggle: true, observing: store.isObserving(e.id),
+                                liveLevel: store.snapshotHas(e.id) ? store.level(for: e.id) : nil,
+                                onToggle: { store.toggle(e.id) }, onOpen: { store.open(id: e.id) })
                 }
             }
         }
     }
 
-    private func filtered(_ cat: String) -> [Provider] {
+    private func filtered(_ cat: String) -> [CatalogEntry] {
         let q = query.trimmingCharacters(in: .whitespaces).lowercased()
-        return store.providers.filter { $0.category == cat && (q.isEmpty || $0.name.lowercased().contains(q)) }
+        return catalogEntries(in: cat).filter { q.isEmpty || $0.name.lowercased().contains(q) }
+    }
+
+    private func providerFor(_ e: CatalogEntry) -> Provider {
+        Provider(id: e.id, name: e.name, category: e.category, level: store.level(for: e.id), home: nil, incident: nil)
     }
 
     private func sectionHeader(_ title: String, _ count: Int) -> some View {

@@ -10,14 +10,15 @@ no keys, no backend of its own.
 
 ## What it does
 
-- **Menu bar** — a small aperture icon whose pupil turns green / amber / red with
-  the worst status among the services you observe. Click for a popover: overall
-  status, your observed services (click any to open its page), refresh, settings.
-- **Notifications** — polls every minute and fires a local notification on a real
-  status transition for a service you observe (never on the first sample, never
+- **Menu bar** — a small reticle whose color tracks the worst status among the
+  services you watch (green / amber / red). Click for your **personalized board**:
+  every service you observe, problems pinned to the top, each clickable to open
+  its page.
+- **Notifications** — polls every 30s and fires a local notification on a real
+  status transition for a service you watch (never on the first sample, never
   to/from `unknown` — same no-fake-news rule as the rest of the project).
-- **Window** — a fuller view to manage what you observe: search the full catalog
-  and star services to add/remove, grouped by category.
+- **Window** — a fuller "Manage" view: search the full catalog and add/remove
+  services, grouped by category, with live status overlaid.
 - **Settings** — launch at login (SMAppService), notifications on/off, refresh
   interval.
 
@@ -56,6 +57,47 @@ The released build is **unsigned** (no Apple Developer secrets in CI), so the
 first launch needs a right-click → **Open** to get past Gatekeeper. To ship a
 signed + notarized build, add your signing identity / notary credentials as
 repo secrets and enable signing in the workflow.
+
+## Onboarding & focus
+
+On first launch the app is **gated behind a short onboarding** (welcome → choose
+what to watch → notifications + launch at login). It's intentionally unusable
+until you finish, because the choose-services step is how the app learns what to
+track. After that, the app **only acts on the services you picked** — it polls
+the single public `/api/status` snapshot (one cached request) and only ever
+notifies for, and shows, your chosen services. It does not start polling at all
+until onboarding completes.
+
+Notifications fire on **any** real transition for an observed service — outage,
+degradation, maintenance, or recovery — never on the first sample after launch,
+and never to/from `unknown`. Freshness is bounded by the chain: the provider's
+own status page → Outage Observer's backend (cron every minute, plus instant
+push for providers wired to its webhook) → the edge-cached snapshot
+(`s-maxage=30`) → the app's 30s poll. So push-backed providers are near-instant;
+the rest land within ~1–2 minutes. The app also refreshes the moment you open
+the menu.
+
+## Publishing to the Mac App Store
+
+The app is built MAS-ready: sandboxed, `network.client` only, an app category,
+and a non-exempt-encryption flag. You need an Apple Developer account.
+
+1. **App ID** — in the Developer portal, register `observer.outage.mac` (no extra
+   capabilities; App Sandbox is automatic for MAS).
+2. **App record** — create the app in App Store Connect (same bundle id), set it
+   to free, fill the privacy section (Outage Observer collects **no** data — it
+   only reads a public status feed), and add screenshots.
+3. **Signing** — in Xcode, set the team on the `OutageObserver` target. For MAS,
+   Xcode uses an *Apple Distribution* certificate + a Mac App Store provisioning
+   profile (Automatic signing handles both).
+4. **Archive & upload** — Product → Archive, then distribute via *App Store
+   Connect* in the Organizer (or export a `.pkg` and upload with Transporter).
+5. Submit for review.
+
+The `mac-release.yml` workflow (GitHub zip) is a **separate**, unsigned channel
+for people who don't want the App Store; MAS upload is done from Xcode with your
+account. Keep `ENABLE_HARDENED_RUNTIME` on (harmless for MAS, required if you
+also ship the Developer-ID zip notarized).
 
 ## Regenerating assets
 

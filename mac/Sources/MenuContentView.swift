@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// The menu-bar popover — the primary surface.
+/// The menu-bar popover — the primary surface. Once onboarded it IS your board:
+/// every service you observe, problems pinned to the top.
 struct MenuContentView: View {
     @EnvironmentObject var store: StatusStore
     @Environment(\.openWindow) private var openWindow
@@ -9,15 +10,20 @@ struct MenuContentView: View {
         VStack(spacing: 0) {
             header
             Divider().overlay(Theme.border)
-            summary
-            Divider().overlay(Theme.border)
-            list
-            Divider().overlay(Theme.border)
-            footer
+            if store.onboarded {
+                statusLine
+                Divider().overlay(Theme.border)
+                board
+                Divider().overlay(Theme.border)
+                footer
+            } else {
+                setupPrompt
+            }
         }
         .frame(width: 320)
         .background(Theme.bgSurface)
         .preferredColorScheme(.dark)
+        .onAppear { if store.onboarded { Task { await store.refresh() } } }   // always fresh on open
     }
 
     private var header: some View {
@@ -25,36 +31,37 @@ struct MenuContentView: View {
             Aperture(size: 18)
             Text("outage.observer").font(.mono(13)).foregroundStyle(Theme.textSecondary)
             Spacer()
-            iconButton("arrow.clockwise") { Task { await store.refresh() } }
-            settingsButton
-            iconButton("macwindow") { openMain() }
+            if store.onboarded {
+                iconButton("arrow.clockwise") { Task { await store.refresh() } }
+                settingsButton
+                iconButton("macwindow") { openMain() }
+            }
         }
         .padding(.horizontal, 12).padding(.vertical, 10)
     }
 
-    private var summary: some View {
+    // A single honest line: green when all clear, the worst color otherwise.
+    private var statusLine: some View {
         let n = store.attentionCount
-        return HStack(spacing: 11) {
-            StatusGlyph(level: n == 0 ? .operational : store.worst, size: 14)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(n == 0 ? "All systems normal" : "\(n) need\(n == 1 ? "s" : "") attention")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Theme.textPrimary)
-                Text(checkedText).font(.mono(10)).foregroundStyle(Theme.textMuted)
-            }
+        return HStack(spacing: 9) {
+            StatusGlyph(level: n == 0 ? .operational : store.worst, size: 11)
+            Text(n == 0 ? "All clear" : "\(n) need\(n == 1 ? "s" : "") attention")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(n == 0 ? Theme.textSecondary : Theme.status(store.worst))
             Spacer()
+            Text(checkedText).font(.mono(10)).foregroundStyle(Theme.textMuted)
         }
-        .padding(.horizontal, 14).padding(.vertical, 12)
+        .padding(.horizontal, 14).padding(.vertical, 9)
     }
 
-    @ViewBuilder private var list: some View {
+    @ViewBuilder private var board: some View {
         if store.observedProviders.isEmpty {
             VStack(spacing: 8) {
-                Text("Not observing anything yet").font(.mono(12)).foregroundStyle(Theme.textMuted)
+                Text("Nothing to watch yet").font(.mono(12)).foregroundStyle(Theme.textMuted)
                 Button("Add services") { openMain() }
                     .buttonStyle(.plain).foregroundStyle(Theme.accent).font(.mono(12))
             }
-            .frame(maxWidth: .infinity).padding(.vertical, 22)
+            .frame(maxWidth: .infinity).padding(.vertical, 24)
         } else {
             ScrollView {
                 VStack(spacing: 0) {
@@ -63,7 +70,7 @@ struct MenuContentView: View {
                     }
                 }
             }
-            .frame(maxHeight: 340)
+            .frame(maxHeight: 360)
         }
     }
 
@@ -80,6 +87,28 @@ struct MenuContentView: View {
         .padding(.horizontal, 14).padding(.vertical, 9)
     }
 
+    private var setupPrompt: some View {
+        VStack(spacing: 12) {
+            Text("Finish setup to choose what to watch.")
+                .font(.mono(12)).foregroundStyle(Theme.textSecondary).multilineTextAlignment(.center)
+            Button("Get started") { OnboardingController.shared.show() }
+                .buttonStyle(.plain)
+                .font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.bgPage)
+                .padding(.horizontal, 18).padding(.vertical, 9)
+                .background(RoundedRectangle(cornerRadius: 9).fill(Theme.accent))
+            Button("Quit") { NSApp.terminate(nil) }
+                .buttonStyle(.plain).font(.mono(10)).foregroundStyle(Theme.textMuted)
+        }
+        .frame(maxWidth: .infinity).padding(.vertical, 26).padding(.horizontal, 18)
+    }
+
+    private var settingsButton: some View {
+        SettingsLink {
+            Image(systemName: "gearshape").font(.system(size: 12)).foregroundStyle(Theme.textMuted).frame(width: 22, height: 22)
+        }
+        .buttonStyle(.plain)
+    }
+
     private var checkedText: String {
         guard let d = store.checkedAt else { return store.loading ? "checking…" : "—" }
         let f = DateFormatter()
@@ -91,13 +120,6 @@ struct MenuContentView: View {
     private func iconButton(_ name: String, _ action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: name).font(.system(size: 12)).foregroundStyle(Theme.textMuted).frame(width: 22, height: 22)
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var settingsButton: some View {
-        SettingsLink {
-            Image(systemName: "gearshape").font(.system(size: 12)).foregroundStyle(Theme.textMuted).frame(width: 22, height: 22)
         }
         .buttonStyle(.plain)
     }

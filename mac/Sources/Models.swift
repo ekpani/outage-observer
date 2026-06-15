@@ -57,17 +57,19 @@ struct Snapshot: Codable {
     let providers: [Provider]
 }
 
-/// Display order for the window's "add services" picker (mirrors the web).
+/// Display order for the pickers (mirrors the web).
 let categoryOrder: [String] = [
     "Cloud & hosting", "AI & model providers", "Dev & CI", "Data & backend",
     "Payments", "Comms", "CDN & edge", "Auth & identity", "Collaboration",
     "Monitoring", "Commerce & CMS", "Analytics",
 ]
 
-/// Commonly-watched services seeded on first run (mirrors POPULAR_IDS).
-let defaultObserving: Set<String> = [
-    "cloudflare", "aws", "github", "vercel", "openai", "anthropic", "stripe", "slack",
-]
+/// Static catalog metadata, indexed (live status overlays from /api/status).
+let catalogByID: [String: CatalogEntry] = Dictionary(uniqueKeysWithValues: catalog.map { ($0.id, $0) })
+
+func catalogEntries(in category: String) -> [CatalogEntry] {
+    catalog.filter { $0.category == category }
+}
 
 func statusURL(for id: String) -> URL {
     URL(string: "https://outage.observer/status/\(id)")!

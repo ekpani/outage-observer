@@ -1,18 +1,29 @@
 import AppKit
 import SwiftUI
 
-/// Single source of truth: polls /api/status, holds the snapshot + the user's
+/// Single source of truth. Polls /api/status, holds the snapshot + the user's
 /// "observing" set, and fires notifications on transitions among observed
 /// services. @MainActor so all @Published mutations are on the main thread.
+///
+/// Focus rule: the app only acts on the services the user chose during
+/// onboarding. Polling doesn't even start until onboarding is complete, and
+/// notifications only ever fire for observed services.
 @MainActor
 final class StatusStore: ObservableObject {
     static let shared = StatusStore()
 
-    @Published var providers: [Provider] = []
-    @Published var checkedAt: Date?
-    @Published var loading = false
-    @Published var lastError: String?
+    /// Live status by provider id, from the most recent /api/status snapshot.
+    @Published private(set) var snapshot: [String: Provider] = [:]
+    @Published private(set) var checkedAt: Date?
+    @Published private(set) var loading = false
+    @Published private(set) var lastError: String?
 
+    @Published var onboarded: Bool {
+        didSet {
+            UserDefaults.standard.set(onboarded, forKey: "didOnboard")
+            if onboarded { startPolling() }
+        }
+    }
     @Published var observing: Set<String> {
         didSet { UserDefaults.standard.set(Array(observing), forKey: "observing") }
     }
@@ -23,7 +34,7 @@ final class StatusStore: ObservableObject {
         }
     }
     @Published var interval: Double {
-        didSet { UserDefaults.standard.set(interval, forKey: "interval"); restartTimer() }
+        didSet { UserDefaults.standard.set(interval, forKey: "interval"); startPolling() }
     }
 
     private var lastLevels: [String: Level] = [:]
@@ -31,42 +42,48 @@ final class StatusStore: ObservableObject {
 
     private init() {
         let d = UserDefaults.standard
-        if let saved = d.array(forKey: "observing") as? [String] {
-            observing = Set(saved)
-        } else {
-            observing = defaultObserving
-        }
+        onboarded = d.bool(forKey: "didOnboard")
+        observing = Set(d.array(forKey: "observing") as? [String] ?? [])
         notificationsEnabled = (d.object(forKey: "notificationsEnabled") as? Bool) ?? true
-        interval = (d.object(forKey: "interval") as? Double) ?? 60
+        // 30s matches the /api/status edge cache (s-maxage=30) — the freshness
+        // floor; polling faster wouldn't return newer data.
+        interval = (d.object(forKey: "interval") as? Double) ?? 30
 
-        // Notification permission is requested contextually during onboarding,
-        // not cold on launch. The poll loop does an immediate first refresh.
-        restartTimer()
+        if onboarded { startPolling() }
     }
 
-    // MARK: Derived
+    // MARK: Derived (catalog-backed, so observed services show even pre-fetch)
 
+    /// A Provider for an observed id: live from the snapshot, or a synthesized
+    /// "unknown" placeholder from catalog metadata until the first fetch lands.
+    private func provider(for id: String) -> Provider? {
+        if let live = snapshot[id] { return live }
+        guard let meta = catalogByID[id] else { return nil }
+        return Provider(id: meta.id, name: meta.name, category: meta.category,
+                        level: .unknown, home: nil, incident: nil)
+    }
+
+    /// The personalized board: every observed service, worst status first.
     var observedProviders: [Provider] {
-        providers
-            .filter { observing.contains($0.id) }
-            .sorted { lhs, rhs in
-                lhs.level.severity != rhs.level.severity
-                    ? lhs.level.severity > rhs.level.severity
-                    : lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
-            }
+        observing.compactMap(provider(for:)).sorted { a, b in
+            a.level.severity != b.level.severity
+                ? a.level.severity > b.level.severity
+                : a.name.localizedCaseInsensitiveCompare(b.name) == .orderedAscending
+        }
     }
+
+    var attention: [Provider] { observedProviders.filter { $0.level.needsAttention } }
+    var attentionCount: Int { attention.count }
 
     /// Worst status among observed (ignoring unknown); operational if all clear.
     var worst: Level {
-        observedProviders
-            .map(\.level)
-            .filter { $0 != .unknown }
+        observedProviders.map(\.level).filter { $0 != .unknown }
             .max(by: { $0.severity < $1.severity }) ?? .operational
     }
 
-    var attentionCount: Int {
-        observedProviders.filter { $0.level.needsAttention }.count
-    }
+    /// Live level for any catalog id (used by the picker once a snapshot exists).
+    func level(for id: String) -> Level { snapshot[id]?.level ?? .unknown }
+    func snapshotHas(_ id: String) -> Bool { snapshot[id] != nil }
 
     func isObserving(_ id: String) -> Bool { observing.contains(id) }
 
@@ -74,16 +91,16 @@ final class StatusStore: ObservableObject {
         if observing.contains(id) { observing.remove(id) } else { observing.insert(id) }
     }
 
-    func open(_ provider: Provider) {
-        NSWorkspace.shared.open(statusURL(for: provider.id))
-    }
+    func open(_ provider: Provider) { NSWorkspace.shared.open(statusURL(for: provider.id)) }
+    func open(id: String) { NSWorkspace.shared.open(statusURL(for: id)) }
 
-    // MARK: Polling
+    func completeOnboarding() { onboarded = true }
 
-    func restartTimer() {
-        // Created inside this @MainActor method, so the task runs on the main
-        // actor — no Sendable gymnastics, and self access stays isolated.
+    // MARK: Polling (only while onboarded)
+
+    func startPolling() {
         pollTask?.cancel()
+        guard onboarded else { return }
         pollTask = Task { [weak self] in
             while !Task.isCancelled {
                 guard let self else { return }
@@ -101,21 +118,22 @@ final class StatusStore: ObservableObject {
             req.setValue("application/json", forHTTPHeaderField: "accept")
             req.cachePolicy = .reloadIgnoringLocalCacheData
             let (data, _) = try await URLSession.shared.data(for: req)
-            let snapshot = try JSONDecoder().decode(Snapshot.self, from: data)
+            let snap = try JSONDecoder().decode(Snapshot.self, from: data)
 
-            // Notify on real transitions for observed services. Never on the
+            // Notify on real transitions for observed services — outages,
+            // degradations, maintenance, and recoveries alike. Never on the
             // first sample (no prior level) and never to/from unknown.
-            for p in snapshot.providers where observing.contains(p.id) {
+            for p in snap.providers where observing.contains(p.id) {
                 if let prev = lastLevels[p.id], prev != p.level, prev != .unknown, p.level != .unknown {
                     if notificationsEnabled {
                         NotificationManager.shared.notify(provider: p, to: p.level)
                     }
                 }
             }
-            for p in snapshot.providers { lastLevels[p.id] = p.level }
+            for p in snap.providers { lastLevels[p.id] = p.level }
 
-            providers = snapshot.providers
-            if let ms = snapshot.checkedAt { checkedAt = Date(timeIntervalSince1970: ms / 1000) }
+            snapshot = Dictionary(uniqueKeysWithValues: snap.providers.map { ($0.id, $0) })
+            if let ms = snap.checkedAt { checkedAt = Date(timeIntervalSince1970: ms / 1000) }
             lastError = nil
         } catch {
             lastError = error.localizedDescription
