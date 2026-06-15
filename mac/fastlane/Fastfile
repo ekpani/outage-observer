@@ -1,0 +1,68 @@
+# Outage Observer for Mac — fastlane.
+#
+#   Mac → Developer ID + notarization (DIRECT download, a DMG off outage.observer).
+#         Distributed directly (not the Mac App Store) so it can ship now.
+#
+# AUTH — App Store Connect API key (Users & Access → Integrations → App Store
+# Connect API → a key with App Manager access). Put these in mac/fastlane/.env
+# (gitignored), or export them:
+#   ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_PATH  (path to the downloaded .p8)
+#
+# Outage Observer is a sandboxed, network-client-only app with no restricted
+# capabilities (no push / iCloud / app groups), so a Developer ID build needs
+# NO provisioning profile — automatic signing resolves the Developer ID cert in
+# the keychain directly. Simpler than apps that need a pinned profile.
+
+opt_out_usage
+
+# Regenerate the Xcode project (xcodegen) before any build.
+before_all do
+  Dir.chdir("..") { sh("xcodegen") }
+end
+
+def asc_key
+  app_store_connect_api_key(
+    key_id: ENV.fetch("ASC_KEY_ID"),
+    issuer_id: ENV.fetch("ASC_ISSUER_ID"),
+    key_filepath: File.expand_path(ENV.fetch("ASC_KEY_PATH"))
+  )
+end
+
+# Build numbers must strictly increase — a UTC timestamp guarantees it without a
+# counter to maintain (xcodegen would clobber an incremented pbxproj).
+def build_number
+  Time.now.utc.strftime("%Y%m%d%H%M")
+end
+
+# Let the archive provision via the ASC API key instead of a signed-in Xcode
+# account (CI runners have no account). Empty if the env isn't set.
+def xcode_asc_auth
+  return "" unless ENV["ASC_KEY_ID"] && ENV["ASC_ISSUER_ID"] && ENV["ASC_KEY_PATH"]
+  " -allowProvisioningUpdates" \
+  " -authenticationKeyID #{ENV['ASC_KEY_ID']}" \
+  " -authenticationKeyIssuerID #{ENV['ASC_ISSUER_ID']}" \
+  " -authenticationKeyPath #{File.expand_path(ENV['ASC_KEY_PATH'])}"
+end
+
+platform :mac do
+  desc "Build, Developer-ID-sign, and notarize the Mac app → build/mac (DIRECT download)"
+  lane :release do
+    key = asc_key
+    # Hardened Runtime is REQUIRED for notarization (the project already sets it).
+    build_mac_app(
+      project: "OutageObserver.xcodeproj",
+      scheme: "OutageObserver",
+      configuration: "Release",
+      export_method: "developer-id",
+      output_directory: "build/mac",
+      clean: true,
+      export_options: { signingStyle: "automatic" },
+      xcargs: "CURRENT_PROJECT_VERSION=#{build_number} ENABLE_HARDENED_RUNTIME=YES#{xcode_asc_auth}"
+    )
+    notarize(
+      package: "build/mac/Outage Observer.app",
+      api_key: key,
+      bundle_id: "observer.outage.mac"
+    )
+  end
+end

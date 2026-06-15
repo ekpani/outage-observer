@@ -11,3 +11,10 @@ AppIcon.iconset/
 
 # macOS
 .DS_Store
+
+# fastlane
+fastlane/.env
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/test_output
+build/

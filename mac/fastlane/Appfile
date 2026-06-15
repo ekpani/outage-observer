@@ -1,0 +1,5 @@
+app_identifier("observer.outage.mac")
+team_id("VRNNS4H6XH")                     # Apple Developer team (code signing)
+# No apple_id on purpose: a username makes fastlane prefer Apple-ID web auth
+# (2FA prompts). We authenticate with the App Store Connect API key — team-bound
+# and non-interactive — for notarization.

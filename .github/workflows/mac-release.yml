@@ -1,91 +1,130 @@
-name: Mac app release
+name: Release Mac
+
+# Builds, Developer-ID-signs, and notarizes the Mac app, packages a branded DMG,
+# and publishes it as a GitHub Release (DIRECT download). Reuses the SAME recipe
+# you run locally: `fastlane mac release`. CI-specific work is staging the
+# signing identity + the App Store Connect API key from repo secrets.
+#
+# Manual-trigger only — you decide when a build ships. Version = MARKETING_VERSION
+# in mac/project.yml; build number = a UTC timestamp (fastlane).
+#
+# SETUP — five repo secrets (Settings → Secrets and variables → Actions). All
+# reusable from your other apps' Developer ID setup:
+#   DEVID_CERT_P12_BASE64  base64 of your exported "Developer ID Application" .p12
+#   DEVID_CERT_PASSWORD    the password you set when exporting that .p12
+#   ASC_KEY_ID             App Store Connect API key id
+#   ASC_ISSUER_ID          App Store Connect issuer id (uuid)
+#   ASC_KEY_P8_BASE64      base64 of the AuthKey_*.p8 file
+# (Outage Observer needs NO provisioning profile — sandbox + network only.)
 
 on:
-  push:
-    tags: ["mac-v*"]
   workflow_dispatch:
+    inputs:
+      prerelease:
+        description: "Mark the GitHub Release as a pre-release (beta)"
+        type: boolean
+        default: true
 
 permissions:
   contents: write
 
+concurrency:
+  group: release-mac
+  cancel-in-progress: false
+
 jobs:
-  build:
-    runs-on: macos-14
-    env:
-      # When the signing secrets are present we produce a Developer ID signed +
-      # notarized build (no Gatekeeper warning). Otherwise we ad-hoc sign so the
-      # app at least runs (an unsigned arm64 binary won't launch at all).
-      HAS_CERT: ${{ secrets.MAC_CERT_P12_BASE64 != '' }}
+  release:
+    runs-on: macos-15
+    defaults:
+      run:
+        working-directory: mac
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Install XcodeGen
-        run: brew install xcodegen
-
-      - name: Generate project
-        working-directory: mac
-        run: xcodegen generate
-
-      - name: Import Developer ID certificate
-        if: env.HAS_CERT == 'true'
-        env:
-          CERT_B64: ${{ secrets.MAC_CERT_P12_BASE64 }}
-          CERT_PW: ${{ secrets.MAC_CERT_PASSWORD }}
-        run: |
-          KEYCHAIN="$RUNNER_TEMP/build.keychain-db"
-          security create-keychain -p actions "$KEYCHAIN"
-          security set-keychain-settings -lut 21600 "$KEYCHAIN"
-          security unlock-keychain -p actions "$KEYCHAIN"
-          echo "$CERT_B64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
-          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" -P "$CERT_PW" -T /usr/bin/codesign
-          security list-keychains -d user -s "$KEYCHAIN" login.keychain-db
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k actions "$KEYCHAIN"
-
-      - name: Build & sign
-        working-directory: mac
-        env:
-          SIGN_ID: ${{ secrets.MAC_SIGN_IDENTITY }}
-        run: |
-          if [ "$HAS_CERT" = "true" ]; then
-            xcodebuild -project OutageObserver.xcodeproj -scheme OutageObserver \
-              -configuration Release -derivedDataPath .build \
-              CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="$SIGN_ID" \
-              OTHER_CODE_SIGN_FLAGS="--timestamp --options runtime" build
-          else
-            xcodebuild -project OutageObserver.xcodeproj -scheme OutageObserver \
-              -configuration Release -derivedDataPath .build \
-              CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=NO build
-          fi
-
-      - name: Notarize & staple
-        if: env.HAS_CERT == 'true'
-        working-directory: mac
-        env:
-          NOTARY_APPLE_ID: ${{ secrets.MAC_NOTARY_APPLE_ID }}
-          NOTARY_PASSWORD: ${{ secrets.MAC_NOTARY_PASSWORD }}
-          NOTARY_TEAM_ID: ${{ secrets.MAC_NOTARY_TEAM_ID }}
-        run: |
-          APP=".build/Build/Products/Release/Outage Observer.app"
-          ditto -c -k --keepParent "$APP" notarize.zip
-          xcrun notarytool submit notarize.zip \
-            --apple-id "$NOTARY_APPLE_ID" --password "$NOTARY_PASSWORD" --team-id "$NOTARY_TEAM_ID" --wait
-          xcrun stapler staple "$APP"
-
-      - name: Package
-        working-directory: mac
-        run: |
-          APP=".build/Build/Products/Release/Outage Observer.app"
-          ditto -c -k --keepParent "$APP" "Outage-Observer-macos.zip"
-
-      - name: Attach to release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
+      - name: Select latest Xcode
+        uses: maxim-lobanov/setup-xcode@v1
         with:
-          files: mac/Outage-Observer-macos.zip
-          body: |
-            **Outage Observer for Mac** — a menu-bar status app with notifications.
-            Requires macOS 14+. Download, unzip, and drag to Applications.
+          xcode-version: latest-stable
 
-            If macOS says it can't verify the developer, right-click the app →
-            **Open** (or System Settings → Privacy & Security → **Open Anyway**).
-            Notarized builds open without any prompt.
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install tools
+        run: brew list xcodegen >/dev/null 2>&1 || brew install xcodegen; brew list create-dmg >/dev/null 2>&1 || brew install create-dmg
+
+      # Import the Developer ID Application identity into a throwaway keychain so
+      # codesign can use it non-interactively, then drop the .p12 from disk.
+      - name: Stage signing identity
+        env:
+          CERT_P12_BASE64: ${{ secrets.DEVID_CERT_P12_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.DEVID_CERT_PASSWORD }}
+        run: |
+          set -euo pipefail
+          KEYCHAIN="$RUNNER_TEMP/app-signing.keychain-db"
+          KPW="$(openssl rand -base64 24)"
+          security create-keychain -p "$KPW" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KPW" "$KEYCHAIN"
+          echo "$CERT_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -P "$CERT_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KPW" "$KEYCHAIN" >/dev/null
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | sed 's/"//g')
+          rm -f "$RUNNER_TEMP/cert.p12"
+
+      # The fastlane lane reads the ASC API key from these env vars (asc_key).
+      - name: Stage App Store Connect API key
+        env:
+          ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/keys"
+          echo "$ASC_KEY_P8_BASE64" | base64 --decode > "$HOME/keys/asc.p8"
+          {
+            echo "ASC_KEY_PATH=$HOME/keys/asc.p8"
+            echo "ASC_KEY_ID=${{ secrets.ASC_KEY_ID }}"
+            echo "ASC_ISSUER_ID=${{ secrets.ASC_ISSUER_ID }}"
+          } >> "$GITHUB_ENV"
+
+      # Same command you run locally: xcodegen (before_all) → build_mac_app
+      # (developer-id, automatic signing via the API key) → notarize → staple.
+      - name: Build, sign, notarize
+        run: fastlane mac release
+
+      - name: Build + notarize the DMG
+        id: pkg
+        run: |
+          set -euo pipefail
+          PLIST="build/mac/Outage Observer.app/Contents/Info.plist"
+          VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$PLIST")"
+          BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$PLIST")"
+          ./scripts/make-dmg.sh "build/mac/Outage Observer.app" "Outage-Observer.dmg"
+          # Notarize the DMG container too (the app inside is already notarized +
+          # stapled) so the download itself is Gatekeeper-clean, then staple it.
+          xcrun notarytool submit "Outage-Observer.dmg" \
+            --key "$ASC_KEY_PATH" --key-id "$ASC_KEY_ID" --issuer "$ASC_ISSUER_ID" --wait
+          xcrun stapler staple "Outage-Observer.dmg"
+          xcrun stapler validate "Outage-Observer.dmg"
+          { echo "version=$VERSION"; echo "build=$BUILD"; } >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub Release + deploy to mac-latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PRERELEASE: ${{ inputs.prerelease }}
+        run: |
+          set -euo pipefail
+          REPO="${{ github.repository }}"
+          TAG="mac-v${{ steps.pkg.outputs.version }}-${{ steps.pkg.outputs.build }}"
+          FLAGS=()
+          [ "$PRERELEASE" = "true" ] && FLAGS+=(--prerelease)
+          # 1) Immutable dated release, for history.
+          gh release create "$TAG" "Outage-Observer.dmg" --repo "$REPO" \
+            --title "Outage Observer for Mac ${{ steps.pkg.outputs.version }} (${{ steps.pkg.outputs.build }})" \
+            --notes "Notarized Developer ID build. Open the DMG and drag Outage Observer to Applications." \
+            "${FLAGS[@]}"
+          # 2) Deploy the LIVE download. outage.observer/mac links to a FIXED URL —
+          #    releases/download/mac-latest/Outage-Observer.dmg. RECREATE the
+          #    release each run (don't just clobber the asset): a clobber keeps the
+          #    old publish date so the repo front page reads "Latest · N days ago"
+          #    and looks stale. Delete + recreate stamps it today.
+          gh release delete mac-latest --repo "$REPO" --yes --cleanup-tag 2>/dev/null || true
+          gh release create mac-latest "Outage-Observer.dmg" --repo "$REPO" --latest --target "$GITHUB_SHA" \
+            --title "Outage Observer for Mac" \
+            --notes "The current Outage Observer for Mac build — notarized Developer ID, direct download."

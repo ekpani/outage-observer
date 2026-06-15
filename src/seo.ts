@@ -355,7 +355,9 @@ export async function handleSeo(env: Env, url: URL): Promise<Response | null> {
 
 const EKPANI = "https://ekpani.com";
 const REPO = "https://github.com/ekpani/outage-observer";
-const RELEASES = REPO + "/releases/latest";
+const RELEASES = REPO + "/releases";
+// Fixed URL the release workflow keeps pointed at the newest notarized build.
+const MAC_DMG = REPO + "/releases/download/mac-latest/Outage-Observer.dmg";
 
 function crumbLd(trail: { name: string; path: string }[]): object {
   return {
@@ -491,7 +493,7 @@ function renderMac(): string {
 <main class="sp-main">
   <h1>Outage Observer for Mac</h1>
   <p class="sp-answer">A native menu-bar app. A quiet reticle that glows when something you watch has trouble, and a notification the moment it does.</p>
-  <p class="sp-meta"><a class="sp-download" href="${RELEASES}" target="_blank" rel="noopener noreferrer">Download for macOS →</a> · free · macOS 14+</p>
+  <p class="sp-meta"><a class="sp-download" href="${MAC_DMG}">Download for macOS →</a> · free · macOS 14+ · notarized</p>
 
   ${macMock()}
 
@@ -506,7 +508,7 @@ function renderMac(): string {
   </section>
   <section>
     <h2>Installing</h2>
-    <p>Download the latest build from <a href="${RELEASES}" target="_blank" rel="noopener noreferrer">GitHub releases</a> and drag it to Applications. A Mac App Store release is on the way; in the meantime, if macOS warns on first launch, right-click the app and choose <em>Open</em>.</p>
+    <p>Open the <a href="${MAC_DMG}">downloaded DMG</a> and drag Outage Observer to Applications. It's a notarized Developer ID build, so it opens without any warning. A Mac App Store release is on the way; older builds are on <a href="${RELEASES}" target="_blank" rel="noopener noreferrer">GitHub releases</a>.</p>
   </section>
   <section>
     <h2>More</h2>
@@ -531,7 +533,7 @@ function renderMac(): string {
         applicationCategory: "DeveloperApplication",
         offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
         url: SITE + "/mac",
-        downloadUrl: RELEASES,
+        downloadUrl: MAC_DMG,
         publisher: { "@type": "Organization", name: "Ekpani", url: EKPANI },
       },
     ],
