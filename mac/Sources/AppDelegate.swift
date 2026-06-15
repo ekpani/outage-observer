@@ -73,8 +73,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    /// A reticle that stems-from-nothing visually but is tinted by the worst
-    /// observed status (green / amber / red) — readable on light and dark bars.
+    /// The menu-bar reticle. When all is well it's a plain template image, so the
+    /// system renders it white on a dark bar and black on a light bar (always
+    /// visible). When something needs attention it's tinted a saturated colour
+    /// (amber / orange / red / blue) that reads on either bar. We use direct
+    /// NSColors here, not Theme's adaptive colors: converting a SwiftUI dynamic
+    /// Color back to NSColor resolved to a near-black tint and the icon vanished.
     private func updateIcon() {
         guard let button = statusItem?.button else { return }
         let cfg = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
@@ -82,6 +86,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .withSymbolConfiguration(cfg)
         img?.isTemplate = true
         button.image = img
-        button.contentTintColor = NSColor(Theme.status(store.worst))
+        button.contentTintColor = menuBarTint(store.worst)   // nil => adapts to the bar
+    }
+
+    private func menuBarTint(_ level: Level) -> NSColor? {
+        switch level {
+        case .maintenance:    return NSColor(hex: 0x5BA8FF)
+        case .degraded:       return NSColor(hex: 0xE5B647)
+        case .partial_outage: return NSColor(hex: 0xF0883E)
+        case .major_outage:   return NSColor(hex: 0xF0726A)
+        case .operational, .unknown: return nil   // template adapts: white on dark, black on light
+        }
     }
 }
