@@ -48,21 +48,31 @@ platform :mac do
   desc "Build, Developer-ID-sign, and notarize the Mac app → build/mac (DIRECT download)"
   lane :release do
     key = asc_key
-    # Hardened Runtime is REQUIRED for notarization (the project already sets it).
-    build_mac_app(
-      project: "OutageObserver.xcodeproj",
-      scheme: "OutageObserver",
-      configuration: "Release",
-      export_method: "developer-id",
-      output_directory: "build/mac",
-      clean: true,
-      export_options: { signingStyle: "automatic" },
-      xcargs: "CURRENT_PROJECT_VERSION=#{build_number} ENABLE_HARDENED_RUNTIME=YES#{xcode_asc_auth}"
-    )
-    notarize(
-      package: "build/mac/Outage Observer.app",
-      api_key: key,
-      bundle_id: "observer.outage.mac"
-    )
+    # Outage Observer has no restricted capabilities, so we DON'T use gym's
+    # archive/export (automatic Developer ID signing tries to resolve a profile
+    # and falls back to cloud signing, which the API key can't do → it fails).
+    # Instead: a plain Release build, then sign the .app directly with the
+    # Developer ID identity + Hardened Runtime + the app's entitlements. No
+    # profile needed. Then notarize + staple.
+    Dir.chdir("..") do   # -> mac/
+      sh("xcodebuild -project OutageObserver.xcodeproj -scheme OutageObserver " \
+         "-configuration Release -derivedDataPath .build " \
+         "CODE_SIGNING_ALLOWED=NO CURRENT_PROJECT_VERSION=#{build_number} build")
+
+      app = "#{Dir.pwd}/.build/Build/Products/Release/Outage Observer.app"
+      identity = sh("security find-identity -v -p codesigning | awk '/Developer ID Application/{print $2; exit}'").strip
+      UI.user_error!("No 'Developer ID Application' identity in the keychain") if identity.empty?
+
+      sh(%Q{codesign --force --options runtime --timestamp --entitlements Resources/OutageObserver.entitlements -s #{identity} "#{app}"})
+      sh(%Q{codesign --verify --strict --verbose=2 "#{app}"})
+
+      sh("mkdir -p build/mac && rm -rf 'build/mac/Outage Observer.app' && ditto '#{app}' 'build/mac/Outage Observer.app'")
+
+      notarize(
+        package: "#{Dir.pwd}/build/mac/Outage Observer.app",
+        api_key: key,
+        bundle_id: "observer.outage.mac"
+      )
+    end
   end
 end
