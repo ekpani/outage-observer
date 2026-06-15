@@ -4,7 +4,7 @@
 
 # Outage Observer
 
-**Live status for every service you depend on — one calm pane of glass, and a ping the moment something breaks.**
+**Live status for every service you depend on. One calm pane of glass, and a ping the moment something breaks.**
 
 [![Live board](https://img.shields.io/badge/board-outage.observer-3FCF5E?style=flat-square)](https://outage.observer)
 [![Telegram](https://img.shields.io/badge/telegram-@outageobserverbot-5BA8FF?style=flat-square)](https://t.me/outageobserverbot)
@@ -28,8 +28,8 @@ everyone, so the whole thing runs on the Cloudflare free tier.
 
 | | |
 |---|---|
-| 🛰 **Live board** | A no-login status board at **[outage.observer](https://outage.observer)** — pin your stack, problems float to the top. |
-| 💬 **Telegram** | **[@outageobserverbot](https://t.me/outageobserverbot)** — search, pick your services, get pinged on changes. |
+| 🛰 **Live board** | A no-login status board at **[outage.observer](https://outage.observer)**. Pin your stack; problems float to the top. |
+| 💬 **Telegram** | **[@outageobserverbot](https://t.me/outageobserverbot)**. Search, pick your services, get pinged on changes. |
 | 🖥 **Mac app** | A native menu-bar app + notifications (below). |
 | 🔔 **Browser push** | Enable alerts straight from the board. |
 | 🧩 **Slack / Discord** | Paste a webhook URL to post changes into a channel. |
