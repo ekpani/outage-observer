@@ -113,7 +113,7 @@ jobs:
           REPO="${{ github.repository }}"
           TAG="mac-v${{ steps.pkg.outputs.version }}-${{ steps.pkg.outputs.build }}"
           FLAGS=()
-          [ "$PRERELEASE" = "true" ] && FLAGS+=(--prerelease)
+          if [ "$PRERELEASE" = "true" ]; then FLAGS+=(--prerelease); fi
           # 1) Immutable dated release, for history.
           gh release create "$TAG" "Outage-Observer.dmg" --repo "$REPO" \
             --title "Outage Observer for Mac ${{ steps.pkg.outputs.version }} (${{ steps.pkg.outputs.build }})" \
