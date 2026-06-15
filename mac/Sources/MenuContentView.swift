@@ -2,9 +2,16 @@ import SwiftUI
 
 /// The menu-bar popover — the primary surface. Once onboarded it IS your board:
 /// every service you observe, problems pinned to the top.
+/// Measures the board's natural content height so the scroll frame fits exactly.
+private struct BoardHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat { 0 }
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+}
+
 struct MenuContentView: View {
     @EnvironmentObject var store: StatusStore
     @Environment(\.openWindow) private var openWindow
+    @State private var boardHeight: CGFloat = 0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -64,18 +71,23 @@ struct MenuContentView: View {
             .frame(maxWidth: .infinity).padding(.vertical, 24)
         } else {
             // A ScrollView has no intrinsic height; inside the self-sizing
-            // MenuBarExtra window it collapses to 0 (the rows vanish). Give it a
-            // definite height — sized to the rows, capped so long lists scroll.
-            let rowH: CGFloat = 36
-            let height = min(CGFloat(store.observedProviders.count) * rowH, 396)
+            // MenuBarExtra window it collapses to 0 (rows vanish). So measure the
+            // rows' real height and pin the frame to exactly that, capped so long
+            // lists scroll. (A fixed per-row estimate left a gap above the footer.)
+            let cap: CGFloat = 396
+            let estimate = min(CGFloat(store.observedProviders.count) * 34, cap)
             ScrollView {
                 VStack(spacing: 0) {
                     ForEach(store.observedProviders) { p in
                         ProviderRow(provider: p, onOpen: { store.open(p) })
                     }
                 }
+                .background(GeometryReader { g in
+                    Color.clear.preference(key: BoardHeightKey.self, value: g.size.height)
+                })
             }
-            .frame(height: height)
+            .frame(height: min(boardHeight > 0 ? boardHeight : estimate, cap))
+            .onPreferenceChange(BoardHeightKey.self) { boardHeight = $0 }
         }
     }
 
