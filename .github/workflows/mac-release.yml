@@ -112,13 +112,15 @@ jobs:
           set -euo pipefail
           REPO="${{ github.repository }}"
           TAG="mac-v${{ steps.pkg.outputs.version }}-${{ steps.pkg.outputs.build }}"
-          FLAGS=()
-          if [ "$PRERELEASE" = "true" ]; then FLAGS+=(--prerelease); fi
+          # macOS runner bash is 3.2: an empty array + set -u trips "unbound
+          # variable", so use a plain string flag (empty expands to nothing).
+          PRE=""
+          if [ "$PRERELEASE" = "true" ]; then PRE="--prerelease"; fi
           # 1) Immutable dated release, for history.
           gh release create "$TAG" "Outage-Observer.dmg" --repo "$REPO" \
             --title "Outage Observer for Mac ${{ steps.pkg.outputs.version }} (${{ steps.pkg.outputs.build }})" \
             --notes "Notarized Developer ID build. Open the DMG and drag Outage Observer to Applications." \
-            "${FLAGS[@]}"
+            $PRE
           # 2) Deploy the LIVE download. outage.observer/mac links to a FIXED URL —
           #    releases/download/mac-latest/Outage-Observer.dmg. RECREATE the
           #    release each run (don't just clobber the asset): a clobber keeps the
