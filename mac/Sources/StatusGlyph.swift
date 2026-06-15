@@ -85,40 +85,46 @@ struct Aperture: View {
 /// boomerang / auto-reverse). Used as the onboarding hero.
 struct RadarView: View {
     var size: CGFloat = 168
-    @State private var spin = false
 
     var body: some View {
-        ZStack {
-            // Concentric scope rings (inner brighter, like the site).
-            ForEach(1...4, id: \.self) { i in
-                Circle()
-                    .stroke(Theme.accent.opacity(0.05 + Double(4 - i) * 0.035), lineWidth: 1)
-                    .frame(width: size * CGFloat(i) / 4, height: size * CGFloat(i) / 4)
-            }
-            // The sweep: a wedge of accent that fades, rotating continuously.
-            AngularGradient(
-                stops: [
+        // Drawn in a Canvas so the rings, the sweep's conic-gradient center, and
+        // the aperture all pivot on the EXACT same point — no anchor drift.
+        TimelineView(.animation) { timeline in
+            Canvas { ctx, sz in
+                let c = CGPoint(x: sz.width / 2, y: sz.height / 2)
+                let maxR = min(sz.width, sz.height) / 2
+
+                // Concentric scope rings (inner brighter, like the site).
+                for i in 1...4 {
+                    let r = maxR * CGFloat(i) / 4
+                    let rect = CGRect(x: c.x - r, y: c.y - r, width: 2 * r, height: 2 * r)
+                    ctx.stroke(Path(ellipseIn: rect),
+                               with: .color(Theme.accent.opacity(0.05 + Double(4 - i) * 0.035)),
+                               lineWidth: 1)
+                }
+
+                // The sweep: a conic gradient centered exactly on c, its start
+                // angle advanced by wall-clock time → continuous rotation.
+                let deg = (timeline.date.timeIntervalSinceReferenceDate / 7)
+                    .truncatingRemainder(dividingBy: 1) * 360
+                let grad = Gradient(stops: [
                     .init(color: Theme.accent.opacity(0.34), location: 0.0),
                     .init(color: Theme.accent.opacity(0.06), location: 0.10),
                     .init(color: .clear, location: 0.30),
                     .init(color: .clear, location: 1.0),
-                ],
-                center: .center
-            )
-            .clipShape(Circle())
+                ])
+                let disc = Path(ellipseIn: CGRect(x: c.x - maxR, y: c.y - maxR, width: 2 * maxR, height: 2 * maxR))
+                ctx.clip(to: disc)
+                ctx.fill(Path(CGRect(origin: .zero, size: sz)),
+                         with: .conicGradient(grad, center: c, angle: .degrees(deg)))
+            }
             .frame(width: size, height: size)
-            .rotationEffect(.degrees(spin ? 360 : 0))
-            .animation(.linear(duration: 7).repeatForever(autoreverses: false), value: spin)
-
-            Aperture(size: size * 0.34)
-                .shadow(color: Theme.accent.opacity(0.4), radius: 12)
+            .overlay {
+                Aperture(size: size * 0.34)
+                    .shadow(color: Theme.accent.opacity(0.4), radius: 12)
+            }
         }
         .frame(width: size, height: size)
-        .mask(
-            RadialGradient(colors: [.black, .black, .clear],
-                           center: .center, startRadius: size * 0.18, endRadius: size * 0.54)
-        )
-        .onAppear { spin = true }
     }
 }
 
