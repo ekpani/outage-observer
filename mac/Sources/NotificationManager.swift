@@ -27,12 +27,28 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate, @un
         }
     }
 
+    /// A clearly-fictional sample so the user can preview the alert + its sound.
+    func sendTest() {
+        requestAuthorization { granted in
+            guard granted else { return }
+            let content = UNMutableNotificationContent()
+            content.title = "Test alert — Example Service"
+            content.body = "A sample so you can hear the sound. Not a real incident."
+            content.sound = UNNotificationSound(named: UNNotificationSoundName("oo-alert.caf"))
+            UNUserNotificationCenter.current().add(
+                UNNotificationRequest(identifier: "oo-test-\(Int(Date().timeIntervalSince1970))", content: content, trigger: nil)
+            )
+        }
+    }
+
     func notify(provider: Provider, to level: Level) {
         let content = UNMutableNotificationContent()
         let recovered = level == .operational
         content.title = recovered ? "\(provider.name) recovered" : "\(provider.name): \(level.label)"
         content.body = provider.incident?.name ?? (recovered ? "Back to normal." : "Status is now \(level.label).")
-        content.sound = .default
+        // Bright rising tone on recovery, a softer tone for trouble (bundled .caf,
+        // so the system still respects Focus / notification settings).
+        content.sound = UNNotificationSound(named: UNNotificationSoundName(recovered ? "oo-recovered.caf" : "oo-alert.caf"))
         content.userInfo = ["url": statusURL(for: provider.id).absoluteString]
         let request = UNNotificationRequest(
             identifier: "oo-\(provider.id)-\(Int(Date().timeIntervalSince1970))",

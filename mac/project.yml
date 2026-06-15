@@ -19,6 +19,8 @@ targets:
       - path: Resources/DepartureMono-Regular.otf
       - path: Resources/DepartureMono-LICENSE.txt
       - path: Resources/AppIcon.icns
+      - path: Resources/oo-recovered.caf
+      - path: Resources/oo-alert.caf
     settings:
       base:
         PRODUCT_NAME: "Outage Observer"

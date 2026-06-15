@@ -20,6 +20,7 @@ struct SettingsScreen: View {
                     group("Alerts")
                     toggleRow("Notify on status changes", isOn: $store.notificationsEnabled)
                     toggleRow("Launch at login", isOn: $launch.enabled)
+                    tapRow("Send a test notification") { NotificationManager.shared.sendTest() }
 
                     group("Refresh")
                     HStack {
