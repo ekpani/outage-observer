@@ -223,6 +223,14 @@ function skeleton() {
     + '<div><div class="sk-bar" style="width:150px;height:14px"></div><div class="sk-bar" style="width:210px;height:10px;margin-top:8px"></div></div></div>' + rows;
 }
 
+function staleBanner(min) {
+  const age = min === Infinity ? "an unknown age" : (min >= 120 ? Math.round(min / 60) + " hours" : Math.round(min) + " min");
+  return '<div class="stale-banner">'
+    + '<strong>⚠ This board may be out of date.</strong> '
+    + 'The last status check was ' + age + ' ago. Treat these as stale until it refreshes.'
+    + '</div>';
+}
+
 function render() {
   const body = document.getElementById("board-body");
   const updEl = document.getElementById("updated");
@@ -230,7 +238,12 @@ function render() {
 
   const providers = BOARD.providers || [];
   const checked = BOARD.checkedAt ? new Date(BOARD.checkedAt) : (BOARD.updatedAt ? new Date(BOARD.updatedAt) : null);
-  updEl.textContent = checked ? "checked " + hhmm(checked) + " UTC" : "";
+  // Staleness guard: the board must NEVER quietly show old statuses as if live.
+  // If the checked time is too old (the poller stalled), say so loudly.
+  const staleMin = checked ? (Date.now() - checked.getTime()) / 60000 : Infinity;
+  const stale = staleMin > 10;
+  updEl.textContent = checked ? (stale ? "⚠ stale · " : "checked ") + hhmm(checked) + " UTC" : "";
+  updEl.classList.toggle("stale", stale);
 
   if (!providers.length) { body.innerHTML = noData(); return; }
 
@@ -246,9 +259,11 @@ function render() {
   if (VIEW === null) VIEW = stack.size ? "board" : "browse";
   if (stack.size === 0) VIEW = "browse";   // no stack -> always the picker
 
-  body.innerHTML = VIEW === "browse"
+  let html = VIEW === "browse"
     ? browseHtml(providers, stack, checked)
     : boardHtml(providers, stack, checked);
+  if (stale) html = staleBanner(staleMin) + html;
+  body.innerHTML = html;
 
   document.body.dataset.view = VIEW;
   applyFilter();

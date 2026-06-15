@@ -1,0 +1,38 @@
+name: Poller heartbeat
+
+# Safety net for the board's freshness. Cloudflare's cron is the primary poller
+# (every minute); this is a backup that pings the poll endpoint on a schedule, so
+# if the Cloudflare cron ever stalls again the board still refreshes instead of
+# silently serving stale statuses. GitHub's scheduled runs can be delayed, so
+# this is a backstop, not the primary — the in-page staleness banner is the last
+# line of defense. For a tighter 1-minute backup, point an external monitor
+# (e.g. cron-job.org) at the same URL.
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"   # every 5 minutes (GitHub's minimum; may run late)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: heartbeat
+  cancel-in-progress: true
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping the poller (refreshes priority providers + one shard)
+        env:
+          POLL_KEY: ${{ secrets.POLL_KEY }}
+        run: |
+          set -euo pipefail
+          # Poll twice so two rotating shards advance each run.
+          for i in 1 2; do
+            code=$(curl -sS -o /dev/null -w "%{http_code}" "https://outage.observer/debug/poll?key=${POLL_KEY}")
+            echo "poll $i -> HTTP $code"
+            [ "$code" = "200" ] || exit 1
+            sleep 5
+          done

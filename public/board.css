@@ -321,3 +321,14 @@ body[data-view="browse"] .row.added .row-main { box-shadow: inset 2px 0 0 var(--
   .row .incident { display: none; }
   .row .pin { margin-right: 8px; }
 }
+
+/* Staleness guard — loud banner when the poller has stalled (data not live). */
+.stale-banner {
+  margin-bottom: var(--oo-space-3);
+  padding: 12px 16px; border-radius: var(--oo-radius-lg);
+  background: var(--oo-status-major_outage-tint);
+  border: 1px solid color-mix(in srgb, var(--oo-status-major_outage-fg) 45%, transparent);
+  color: var(--oo-text-primary); font-size: 13px; line-height: 1.5;
+}
+.stale-banner strong { color: var(--oo-status-major_outage-fg); }
+.updated.stale { color: var(--oo-status-major_outage-fg) !important; }

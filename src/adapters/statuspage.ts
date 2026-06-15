@@ -21,20 +21,22 @@ export async function fetchStatuspage(base: string): Promise<ProviderStatus> {
   const data = await res.json<any>();
   const indicator: string = data?.status?.indicator ?? "none";
   const openIncidents: any[] = Array.isArray(data?.incidents) ? data.incidents : [];
-  const inMaintenance = (data?.scheduled_maintenances ?? []).some(
-    (m: any) => m?.status === "in_progress",
-  );
 
+  // Scheduled maintenance is NOT rolled into the status. Big providers run
+  // rolling per-datacenter maintenance almost constantly (Cloudflare lists ~10
+  // at a time), so surfacing it as "maintenance" is pure noise and reads as a
+  // problem when there isn't one. A maintenance that actually impacts service
+  // shows through the indicator / an open incident instead.
   let level: Level;
   if (indicator === "minor") {
-    level = openIncidents.length > 0 ? "degraded" : inMaintenance ? "maintenance" : "operational";
+    // "minor" with no open incident is routine component/edge noise → operational.
+    level = openIncidents.length > 0 ? "degraded" : "operational";
   } else if (indicator === "major") {
     level = "partial_outage";
   } else if (indicator === "critical") {
     level = "major_outage";
   } else {
-    // "none" (or anything unrecognized) is operational, unless mid-maintenance.
-    level = inMaintenance ? "maintenance" : "operational";
+    level = "operational";
   }
 
   const incidents: Incident[] = openIncidents.map((i: any) => ({
