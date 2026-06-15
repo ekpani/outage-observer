@@ -3,6 +3,7 @@ import { LABEL } from "./labels";
 import { getBoard, getCheckedAt, getHistory, type BoardEntry } from "./store";
 import { type Env } from "./telegram";
 import { type Level } from "./adapters";
+import { fetchRecentIncidents } from "./incidents";
 
 const SITE = "https://outage.observer";
 const BY_ID = new Map(CATALOG.map((p) => [p.id, p] as const));
@@ -111,6 +112,7 @@ export async function renderProviderPage(env: Env, provider: Provider): Promise<
     getCheckedAt(env),
     getHistory(env, [provider.id], 20),
   ]);
+  const recentIncidents = await fetchRecentIncidents(provider, 5);
   const entry = (board?.providers ?? []).find((e) => e.id === provider.id);
   const level = levelOf(entry);
   const incident = entry?.incident?.name;
@@ -119,11 +121,28 @@ export async function renderProviderPage(env: Env, provider: Provider): Promise<
   const canonical = `${SITE}/status/${provider.id}`;
 
   const related = CATALOG.filter((p) => p.category === provider.category && p.id !== provider.id).slice(0, 8);
-  const historyRows = history.length
-    ? `<ul class="sp-history">` + history.map((h) =>
-        `<li>${statusPill(h.level)}<time datetime="${new Date(h.at).toISOString()}">${stamp(h.at)}</time></li>`,
-      ).join("") + `</ul>`
-    : `<p class="sp-muted">No status changes recorded yet. Changes appear here as they happen.</p>`;
+
+  // Prefer the provider's own recent incidents (real history); fall back to the
+  // transitions we've recorded since we started watching; then an empty note.
+  let historyTitle = "Recent incidents";
+  let historyRows: string;
+  if (recentIncidents.length) {
+    historyRows = `<ul class="sp-history">` + recentIncidents.map((i) => {
+      const name = i.url
+        ? `<a class="inc-name" href="${esc(i.url)}" target="_blank" rel="noopener nofollow">${esc(i.name)}</a>`
+        : `<span class="inc-name">${esc(i.name)}</span>`;
+      const tag = i.resolved ? "resolved" : "ongoing";
+      return `<li>${statusPill(i.level as Level)}${name}<time datetime="${new Date(i.at).toISOString()}">${stamp(i.at)} · ${tag}</time></li>`;
+    }).join("") + `</ul>`;
+  } else if (history.length) {
+    historyTitle = "Recent status changes";
+    historyRows = `<ul class="sp-history">` + history.map((h) =>
+      `<li>${statusPill(h.level)}<time datetime="${new Date(h.at).toISOString()}">${stamp(h.at)}</time></li>`,
+    ).join("") + `</ul>`;
+  } else {
+    historyTitle = "Recent status changes";
+    historyRows = `<p class="sp-muted">No status changes recorded yet. Changes appear here as they happen.</p>`;
+  }
 
   const body = `<nav class="sp-crumbs" aria-label="Breadcrumb"><a href="/">Home</a> / <a href="/status">Status</a> / <span>${esc(provider.name)}</span></nav>
 <main class="sp-main">
@@ -135,7 +154,7 @@ export async function renderProviderPage(env: Env, provider: Provider): Promise<
   <p class="sp-meta">${esc(provider.category)} · <a href="${esc(official)}" target="_blank" rel="noopener nofollow">Official status page →</a></p>
 
   <section>
-    <h2>Recent status changes</h2>
+    <h2>${historyTitle}</h2>
     ${historyRows}
   </section>
 
