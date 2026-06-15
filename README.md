@@ -65,3 +65,11 @@ curl -s https://status.openai.com/api/v2/summary.json | head
 - "Add your own status page" by URL (auto-detect type)
 - Component-level subscriptions (e.g. GitHub Actions only)
 - Web dashboard / Telegram Mini App (the reserved `web/` slot)
+
+## License
+
+Source-available under the **PolyForm Noncommercial License 1.0.0** — free to
+use, modify, and share for **noncommercial** purposes; all commercial rights are
+reserved by Ekpani. See [`LICENSE.md`](LICENSE.md). "Outage Observer", "Ekpani",
+and the aperture mark are trademarks and are not licensed. Bundled third-party
+components keep their own licenses — see [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md).
