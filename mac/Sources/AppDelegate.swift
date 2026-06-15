@@ -3,19 +3,36 @@ import SwiftUI
 import Combine
 import CoreText
 
-private extension NSImage {
-    /// A non-template copy of a (template) symbol with `color` baked into its
-    /// pixels, so it renders that colour regardless of the menu bar's appearance.
-    func baked(with color: NSColor) -> NSImage {
-        let out = NSImage(size: size)
-        out.lockFocus()
-        let rect = NSRect(origin: .zero, size: size)
-        draw(in: rect)
-        color.set()
-        rect.fill(using: .sourceAtop)
-        out.unlockFocus()
-        return out
+/// A scope reticle drawn with a high-contrast `ring` (so it's legible on any
+/// menu bar) and a status-coloured `pupil`. Mirrors the SF Symbol "dot.scope".
+private func reticleImage(ring: NSColor, pupil: NSColor, size: CGFloat = 18) -> NSImage {
+    let img = NSImage(size: NSSize(width: size, height: size))
+    img.lockFocus()
+    let c = NSPoint(x: size / 2, y: size / 2)
+    let r = size * 0.34
+
+    ring.setStroke()
+    let circle = NSBezierPath(ovalIn: NSRect(x: c.x - r, y: c.y - r, width: 2 * r, height: 2 * r))
+    circle.lineWidth = 1.5
+    circle.stroke()
+
+    let ticks = NSBezierPath()
+    ticks.lineWidth = 1.5
+    let t0 = r + 0.8, t1 = r + 2.8
+    for (dx, dy) in [(0.0, 1.0), (0.0, -1.0), (1.0, 0.0), (-1.0, 0.0)] {
+        ticks.move(to: NSPoint(x: c.x + dx * t0, y: c.y + dy * t0))
+        ticks.line(to: NSPoint(x: c.x + dx * t1, y: c.y + dy * t1))
     }
+    ring.setStroke()
+    ticks.stroke()
+
+    pupil.setFill()
+    let pr = size * 0.13
+    NSBezierPath(ovalIn: NSRect(x: c.x - pr, y: c.y - pr, width: 2 * pr, height: 2 * pr)).fill()
+
+    img.unlockFocus()
+    img.isTemplate = false
+    return img
 }
 
 /// Owns the menu-bar status item and the popover. We use AppKit's NSStatusItem +
@@ -97,15 +114,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// colour on any bar with no tinting involved.
     private func updateIcon() {
         guard let button = statusItem?.button else { return }
-        let cfg = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
-        let base = NSImage(systemSymbolName: "dot.scope", accessibilityDescription: "Outage Observer")?
-            .withSymbolConfiguration(cfg)
         button.contentTintColor = nil
 
-        if let tint = menuBarTint(store.worst), let colored = base?.baked(with: tint) {
-            colored.isTemplate = false
-            button.image = colored
+        if let tint = menuBarTint(store.worst) {
+            // Attention: a high-contrast ring (white on a dark bar, black on a
+            // light bar) keeps it legible on any wallpaper; the pupil carries the
+            // status colour. Re-read on every poll, so it self-corrects if the
+            // bar's light/dark changes.
+            let dark = button.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            button.image = reticleImage(ring: dark ? .white : .black, pupil: tint)
         } else {
+            // All clear: plain template — the system renders it white on dark,
+            // black on light, always visible.
+            let cfg = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
+            let base = NSImage(systemSymbolName: "dot.scope", accessibilityDescription: "Outage Observer")?
+                .withSymbolConfiguration(cfg)
             base?.isTemplate = true
             button.image = base
         }
