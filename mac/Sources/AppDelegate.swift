@@ -3,6 +3,38 @@ import SwiftUI
 import Combine
 import CoreText
 
+/// The scope reticle as a TEMPLATE image (ring + ticks + centre dot), drawn so
+/// its centre is the exact image centre. Template → the system colours it like
+/// every other menu-bar icon (black on light bars, white on dark). The colored
+/// status pupil is overlaid separately, pinned to the same centre.
+private func menuBarScope(size: CGFloat = 18) -> NSImage {
+    let img = NSImage(size: NSSize(width: size, height: size))
+    img.lockFocus()
+    NSColor.black.set()   // template: the shape matters, not the colour
+    let c = NSPoint(x: size / 2, y: size / 2)
+    let r = size * 0.3
+
+    let ring = NSBezierPath(ovalIn: NSRect(x: c.x - r, y: c.y - r, width: 2 * r, height: 2 * r))
+    ring.lineWidth = 1.4
+    ring.stroke()
+
+    let ticks = NSBezierPath()
+    ticks.lineWidth = 1.4
+    let t0 = r + 0.6, t1 = r + 2.4
+    for (dx, dy) in [(0.0, 1.0), (0.0, -1.0), (1.0, 0.0), (-1.0, 0.0)] {
+        ticks.move(to: NSPoint(x: c.x + dx * t0, y: c.y + dy * t0))
+        ticks.line(to: NSPoint(x: c.x + dx * t1, y: c.y + dy * t1))
+    }
+    ticks.stroke()
+
+    let pr: CGFloat = 1.7
+    NSBezierPath(ovalIn: NSRect(x: c.x - pr, y: c.y - pr, width: 2 * pr, height: 2 * pr)).fill()
+
+    img.unlockFocus()
+    img.isTemplate = true
+    return img
+}
+
 /// Owns the menu-bar status item and the popover. We use AppKit's NSStatusItem +
 /// NSPopover (rather than SwiftUI's MenuBarExtra) so the popover shows the
 /// standard arrow that stems from the icon and anchors centered beneath it.
@@ -89,18 +121,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // other menu-bar icon — black on a light (wallpaper-driven) bar, white on
         // a dark one. (effectiveAppearance can't tell us this; only template
         // rendering tracks the wallpaper.) The status colour rides on top as a
-        // separate layer over the scope's centre, so the ring always adapts.
-        let cfg = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
-        let base = NSImage(systemSymbolName: "dot.scope", accessibilityDescription: "Outage Observer")?
-            .withSymbolConfiguration(cfg)
-        base?.isTemplate = true
-        button.image = base
+        // separate layer pinned to the scope's exact centre, so the ring adapts.
+        button.image = menuBarScope()
 
         let dot = ensurePupilLayer(on: button)
         if let tint = menuBarTint(store.worst) {
             let s: CGFloat = 5
-            dot.frame = CGRect(x: button.bounds.midX - s / 2, y: button.bounds.midY - s / 2, width: s, height: s)
+            dot.bounds = CGRect(x: 0, y: 0, width: s, height: s)
             dot.cornerRadius = s / 2
+            dot.position = CGPoint(x: button.bounds.midX, y: button.bounds.midY)   // anchor 0.5,0.5
+            dot.contentsScale = button.window?.backingScaleFactor ?? 2
             dot.backgroundColor = tint.cgColor
             dot.isHidden = false
         } else {
