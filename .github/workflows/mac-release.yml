@@ -118,8 +118,17 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/sparkle-dl" "$RUNNER_TEMP/sparkle-tools"
-          gh release download --repo sparkle-project/Sparkle --pattern 'Sparkle-*.tar.xz' --dir "$RUNNER_TEMP/sparkle-dl"
-          tar -xJf "$RUNNER_TEMP"/sparkle-dl/Sparkle-*.tar.xz -C "$RUNNER_TEMP/sparkle-tools"
+          # PIN the Sparkle tools to an exact version + verify its checksum. This
+          # binary runs with the EdDSA private signing key on its stdin, so it must
+          # not be "whatever latest happens to be" (supply-chain) — and an exact
+          # filename avoids any multi-asset glob ambiguity.
+          SPARKLE_VERSION="2.9.3"
+          SPARKLE_SHA256="74a07da821f92b79310009954c0e15f350173374a3abe39095b4fc5096916be6"
+          TARBALL="$RUNNER_TEMP/sparkle-dl/Sparkle-${SPARKLE_VERSION}.tar.xz"
+          gh release download "$SPARKLE_VERSION" --repo sparkle-project/Sparkle \
+            --pattern "Sparkle-${SPARKLE_VERSION}.tar.xz" --output "$TARBALL"
+          echo "${SPARKLE_SHA256}  ${TARBALL}" | shasum -a 256 -c -
+          tar -xJf "$TARBALL" -C "$RUNNER_TEMP/sparkle-tools"
           GA="$RUNNER_TEMP/sparkle-tools/bin/generate_appcast"
           STAGE="$RUNNER_TEMP/appcast-stage"
           mkdir -p "$STAGE"
@@ -135,7 +144,9 @@ jobs:
             --link "https://outage.observer/mac" \
             "$STAGE"
           cp "$STAGE/appcast.xml" appcast.xml
-          echo "--- appcast.xml ---"; cat appcast.xml
+          # Confirm an item was signed without dumping the whole feed into the log
+          # (this step has the private key in its env; keep its output minimal).
+          grep -q "sparkle:edSignature" appcast.xml && echo "appcast signed OK ($(grep -c '<item>' appcast.xml) item)"
 
       - name: Publish GitHub Release + deploy to mac-latest
         env:
@@ -144,22 +155,26 @@ jobs:
         run: |
           set -euo pipefail
           REPO="${{ github.repository }}"
-          TAG="mac-v${{ steps.pkg.outputs.version }}-${{ steps.pkg.outputs.build }}"
-          # macOS runner bash is 3.2: an empty array + set -u trips "unbound
-          # variable", so use a plain string flag (empty expands to nothing).
-          PRE=""
-          if [ "$PRERELEASE" = "true" ]; then PRE="--prerelease"; fi
-          # 1) Immutable dated release, for history.
-          gh release create "$TAG" "Outage-Observer.dmg" "appcast.xml" --repo "$REPO" \
-            --title "Outage Observer for Mac ${{ steps.pkg.outputs.version }} (${{ steps.pkg.outputs.build }})" \
-            --notes "Notarized Developer ID build. Open the DMG and drag Outage Observer to Applications." \
-            $PRE
-          # 2) Deploy the LIVE download. outage.observer/mac links to a FIXED URL —
-          #    releases/download/mac-latest/Outage-Observer.dmg. RECREATE the
-          #    release each run (don't just clobber the asset): a clobber keeps the
-          #    old publish date so the repo front page reads "Latest · N days ago"
-          #    and looks stale. Delete + recreate stamps it today.
-          gh release delete mac-latest --repo "$REPO" --yes --cleanup-tag 2>/dev/null || true
-          gh release create mac-latest "Outage-Observer.dmg" "appcast.xml" --repo "$REPO" --latest --target "$GITHUB_SHA" \
-            --title "Outage Observer for Mac" \
-            --notes "The current Outage Observer for Mac build — notarized Developer ID, direct download."
+          VERSION="${{ steps.pkg.outputs.version }}"
+          BUILD="${{ steps.pkg.outputs.build }}"
+          TAG="mac-v${VERSION}-${BUILD}"
+          # Empty-string flags (NOT bash arrays) so set -u is safe on old bash.
+          PRE=""; LATEST="--latest"
+          if [ "$PRERELEASE" = "true" ]; then PRE="--prerelease"; LATEST=""; fi
+          # 1) Immutable dated release: the history entry AND the repo's "Latest"
+          #    badge with TODAY's date (unless this is a prerelease). The dated
+          #    release carries the fresh date so mac-latest doesn't need to.
+          gh release create "$TAG" "Outage-Observer.dmg" --repo "$REPO" $PRE $LATEST \
+            --title "Outage Observer for Mac ${VERSION} (${BUILD})" \
+            --notes "Notarized Developer ID build. Open the DMG and drag Outage Observer to Applications."
+          # 2) mac-latest: the FIXED rolling download + appcast URL
+          #    (outage.observer/mac and /appcast.xml resolve to its assets).
+          #    CLOBBER assets in place — never delete→recreate: a failure between a
+          #    delete and a recreate would 404 the live download AND break every
+          #    installed app's update feed. It's a stable pointer, not the dated
+          #    "Latest" entry, so its own publish date doesn't matter.
+          gh release view mac-latest --repo "$REPO" >/dev/null 2>&1 || \
+            gh release create mac-latest --repo "$REPO" --target "$GITHUB_SHA" \
+              --title "Outage Observer for Mac" \
+              --notes "The current Outage Observer for Mac build — notarized Developer ID, direct download."
+          gh release upload mac-latest "Outage-Observer.dmg" "appcast.xml" --repo "$REPO" --clobber

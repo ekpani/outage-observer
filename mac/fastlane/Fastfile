@@ -70,20 +70,23 @@ platform :mac do
       # inside-out — sign the deepest helpers first, then the framework, then the
       # app. (No entitlements on the helpers: the app is not sandboxed, so the
       # default Sparkle XPC services need none.)
+      # FAIL LOUDLY if an expected item is missing rather than silently skipping
+      # it: a future Sparkle that reorganizes these paths would otherwise ship an
+      # unsigned nested Mach-O and fail notarization (or trip Gatekeeper).
       sign = lambda do |path|
-        sh(%Q{codesign --force --options runtime --timestamp -s #{identity} "#{path}"}) if File.exist?(path)
+        UI.user_error!("Code to sign is missing (Sparkle layout changed?): #{path}") unless File.exist?(path)
+        sh(%Q{codesign --force --options runtime --timestamp -s #{identity} "#{path}"})
       end
       fw = "#{app}/Contents/Frameworks/Sparkle.framework"
-      if File.exist?(fw)
-        v = "#{fw}/Versions/Current"
-        [
-          "#{v}/XPCServices/Downloader.xpc",
-          "#{v}/XPCServices/Installer.xpc",
-          "#{v}/Updater.app",
-          "#{v}/Autoupdate",
-          fw,
-        ].each { |p| sign.call(p) }
-      end
+      UI.user_error!("Sparkle.framework not found at #{fw} — the app bundles Sparkle, so signing would miss it") unless File.exist?(fw)
+      v = "#{fw}/Versions/Current"
+      [
+        "#{v}/XPCServices/Downloader.xpc",
+        "#{v}/XPCServices/Installer.xpc",
+        "#{v}/Updater.app",
+        "#{v}/Autoupdate",
+        fw,
+      ].each { |p| sign.call(p) }
 
       sh(%Q{codesign --force --options runtime --timestamp --entitlements Resources/OutageObserver.entitlements -s #{identity} "#{app}"})
       # --deep --strict so verification also walks the nested Sparkle code.

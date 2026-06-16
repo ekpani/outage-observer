@@ -67,11 +67,18 @@ export default {
     // here and redirect to the appcast asset on the rolling `mac-latest` GitHub
     // release (regenerated and re-signed by CI on every Mac release). 302 (not
     // 301) so the target can move; Sparkle follows the redirect.
-    if (request.method === "GET" && url.pathname === "/appcast.xml") {
-      return Response.redirect(
-        "https://github.com/ekpani/outage-observer/releases/download/mac-latest/appcast.xml",
-        302,
-      );
+    if ((request.method === "GET" || request.method === "HEAD") && url.pathname === "/appcast.xml") {
+      // 302 (not 301): the target moves to the current mac-latest asset each
+      // release. The redirect *path* is stable, so let the edge cache it briefly
+      // to shed Worker invocations from update checks. HEAD is handled too (some
+      // proxies / uptime checks probe with it).
+      return new Response(null, {
+        status: 302,
+        headers: {
+          location: "https://github.com/ekpani/outage-observer/releases/download/mac-latest/appcast.xml",
+          "cache-control": "public, max-age=300",
+        },
+      });
     }
 
     // SEO / AEO surfaces: server-rendered provider pages, the directory,

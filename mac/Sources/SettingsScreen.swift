@@ -82,6 +82,16 @@ struct SettingsScreen: View {
             Text("Clears the services you watch and your preferences, then restarts onboarding.")
         }
         .onAppear { NotificationManager.shared.isDenied { notifDenied = $0 } }
+        // Re-check when the user tabs back from System Settings (so a fixed
+        // permission clears the warning) and when they flip the toggle (so
+        // enabling while system-denied surfaces the recovery row instead of
+        // silently arming notifications the OS will drop).
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            NotificationManager.shared.isDenied { notifDenied = $0 }
+        }
+        .onChange(of: store.notificationsEnabled) { _, _ in
+            NotificationManager.shared.isDenied { notifDenied = $0 }
+        }
     }
 
     private func warnRow(_ label: String, action: @escaping () -> Void) -> some View {

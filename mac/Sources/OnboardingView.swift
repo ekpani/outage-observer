@@ -293,6 +293,12 @@ private struct ReadyStep: View {
             NotificationManager.shared.isAuthorized { notifGranted = $0 }
             NotificationManager.shared.isDenied { notifDenied = $0 }
         }
+        // Re-check when tabbing back from System Settings so the card reflects a
+        // permission the user just changed there.
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            NotificationManager.shared.isAuthorized { notifGranted = $0 }
+            NotificationManager.shared.isDenied { notifDenied = $0 }
+        }
     }
 
     private func toggleCard(icon: String, on: Bool, title: String, sub: String, action: @escaping () -> Void) -> some View {

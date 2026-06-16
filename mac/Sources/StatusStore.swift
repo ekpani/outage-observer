@@ -66,6 +66,7 @@ final class StatusStore: ObservableObject {
 
     private var lastLevels: [String: Level] = [:]
     private var pollTask: Task<Void, Never>?
+    private var freshnessTask: Task<Void, Never>?
 
     private init() {
         let d = UserDefaults.standard
@@ -180,12 +181,26 @@ final class StatusStore: ObservableObject {
 
     func startPolling() {
         pollTask?.cancel()
+        freshnessTask?.cancel()
         guard onboarded else { return }
         pollTask = Task { [weak self] in
             while !Task.isCancelled {
                 guard let self else { return }
                 await self.refresh()
                 try? await Task.sleep(for: .seconds(max(15, self.interval)))
+            }
+        }
+        // `isStale` reads the wall clock, but views/the menu-bar icon only
+        // re-evaluate it when @Published state changes — i.e. on a poll tick. At
+        // the slow (5-min) interval that leaves a window where an idle/offline
+        // popover keeps showing confident status after the data crosses the
+        // 10-min staleness line. Re-publish every 60s so freshness re-evaluates
+        // regardless of poll cadence (no network — just an objectWillChange).
+        freshnessTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(60))
+                guard let self else { return }
+                self.objectWillChange.send()
             }
         }
     }
