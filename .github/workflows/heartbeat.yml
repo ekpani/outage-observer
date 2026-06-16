@@ -26,12 +26,16 @@ jobs:
     steps:
       - name: Ping the poller (refreshes priority providers + one shard)
         env:
+          # Must equal the Worker's DEBUG_KEY secret — /debug/poll checks
+          # env.DEBUG_KEY. (GitHub and Cloudflare secrets can't be auto-linked, so
+          # keep the two values in sync; a mismatch silently 404s every run.)
           POLL_KEY: ${{ secrets.POLL_KEY }}
         run: |
           set -euo pipefail
-          # Poll twice so two rotating shards advance each run.
+          # Poll twice so two rotating shards advance each run. Pass the key as a
+          # header, not a query string, so it doesn't land in request logs.
           for i in 1 2; do
-            code=$(curl -sS -o /dev/null -w "%{http_code}" "https://outage.observer/debug/poll?key=${POLL_KEY}")
+            code=$(curl -sS -o /dev/null -w "%{http_code}" -H "x-debug-key: ${POLL_KEY}" "https://outage.observer/debug/poll")
             echo "poll $i -> HTTP $code"
             [ "$code" = "200" ] || exit 1
             sleep 5

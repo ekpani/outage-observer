@@ -85,7 +85,10 @@ export default {
     // sitemap, and llms.txt. Edge-cached so crawlers don't hit KV/D1 each time.
     if (request.method === "GET" && (url.pathname === "/status" || url.pathname.startsWith("/status/") || url.pathname === "/sitemap.xml" || url.pathname === "/llms.txt" || ["/privacy", "/about", "/support", "/mac", "/alerts"].includes(url.pathname))) {
       const cache = caches.default;
-      const cacheKey = new Request(url.toString());
+      // Key by path only: these pages ignore query params, so caching by full URL
+      // lets `?x=1`, `?x=2`, … each spawn a distinct entry — cache dilution that
+      // forces needless re-renders (and KV/subrequest cost) on junk queries.
+      const cacheKey = new Request(new URL(url.pathname, url.origin).toString());
       const hit = await cache.match(cacheKey);
       if (hit) return hit;
       const res = await handleSeo(env, url);
@@ -93,6 +96,14 @@ export default {
         if (res.ok) ctx.waitUntil(cache.put(cacheKey, res.clone()));
         return res;
       }
+    }
+
+    // Cap inbound JSON on the public POST routes (their payloads are always tiny)
+    // before parsing — a cheap guard against a multi-MB body OOM-ing the isolate.
+    if (request.method === "POST"
+        && (url.pathname.startsWith("/api/push/") || url.pathname.startsWith("/api/webhook/"))
+        && oversized(request)) {
+      return json({ error: "Payload too large." }, 413);
     }
 
     // Web Push: hand the browser the VAPID public key it needs to subscribe.
@@ -197,10 +208,15 @@ export default {
       }
     }
 
-    // Debug routes (dev only; remove or move behind a header before launch).
-    if (url.pathname === "/debug/poll" && (await safeEqual(url.searchParams.get("key") ?? "", env.DEBUG_KEY))) {
-      const n = await poll(env, Date.now());
-      return new Response(`polled one shard, ${n} transition(s)`);
+    // Manual poll trigger (used by the GitHub Actions heartbeat backstop).
+    // Accept the key via header (preferred — stays out of request logs) or the
+    // legacy query param; both are checked timing-safe against DEBUG_KEY.
+    if (url.pathname === "/debug/poll") {
+      const provided = request.headers.get("x-debug-key") ?? url.searchParams.get("key") ?? "";
+      if (await safeEqual(provided, env.DEBUG_KEY)) {
+        const n = await poll(env, Date.now());
+        return new Response(`polled one shard, ${n} transition(s)`);
+      }
     }
 
     // Short, shareable provider URLs: /stripe -> /status/stripe (301). Static
@@ -216,6 +232,14 @@ export default {
     return new Response("not found", { status: 404 });
   },
 };
+
+/** Reject obviously-oversized request bodies before parsing — a cheap
+ *  memory-DoS guard on the public POST routes (their JSON is always tiny). A
+ *  spoofed/absent Content-Length just falls through to the normal small parse. */
+function oversized(request: Request, maxBytes = 16384): boolean {
+  const len = Number(request.headers.get("content-length") ?? "0");
+  return Number.isFinite(len) && len > maxBytes;
+}
 
 /** Constant-time secret comparison: hash both sides to a fixed size, then
  *  use timingSafeEqual to avoid leaking length or content via timing. */

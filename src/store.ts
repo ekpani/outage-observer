@@ -271,7 +271,7 @@ export async function getTargetsForProvider(env: Env, providerId: string): Promi
 export async function enqueueTargetEvent(env: Env, targetId: number, payload: string): Promise<void> {
   await env.DB
     .prepare("INSERT INTO target_outbox (target_id, payload, created_at, sent) VALUES (?, ?, ?, 0)")
-    .bind(targetId, payload)
+    .bind(targetId, payload, Date.now())
     .run();
 }
 

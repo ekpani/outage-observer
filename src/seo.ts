@@ -49,7 +49,15 @@ function statusPill(level: Level): string {
 
 // ---- Page shell (dark-first, on brand, no app JS) ----
 function shell(opts: { title: string; description: string; canonical: string; jsonld: object[]; body: string; image?: string; script?: string }): string {
-  const ld = opts.jsonld.map((o) => `<script type="application/ld+json">${JSON.stringify(o)}</script>`).join("\n");
+  // Escape the JSON-LD for the <script> context. JSON.stringify does NOT escape
+  // `<`/`>`, so an upstream incident title containing `</script>…` would break
+  // out of the element and execute (stored XSS). \u-escaping these keeps the
+  // JSON valid for schema.org consumers while making `</script>` impossible.
+  const ld = opts.jsonld.map((o) =>
+    `<script type="application/ld+json">${
+      JSON.stringify(o).replace(/</g, "\\u003c").replace(/>/g, "\\u003e").replace(/&/g, "\\u0026")
+    }</script>`,
+  ).join("\n");
   const image = opts.image ?? SITE + "/og.png";
   return `<!doctype html>
 <html lang="en">
@@ -119,7 +127,12 @@ export async function renderProviderPage(env: Env, provider: Provider): Promise<
   const level = levelOf(entry);
   const incident = entry?.incident?.name;
   const official = provider.link ?? provider.url;
-  const asOf = checkedAt ? `As of ${stamp(checkedAt)}, ` : "";
+  // Don't assert a confident live verdict over a frozen feed (same 10-min
+  // threshold as the web board). If the poller stalled, the data may be stale.
+  const stale = checkedAt != null && Date.now() - checkedAt > 10 * 60 * 1000;
+  const asOf = checkedAt
+    ? (stale ? `Last checked ${stamp(checkedAt)} (may be out of date): ` : `As of ${stamp(checkedAt)}, `)
+    : "";
   const canonical = `${SITE}/status/${provider.id}`;
 
   const related = CATALOG.filter((p) => p.category === provider.category && p.id !== provider.id).slice(0, 8);
@@ -190,8 +203,9 @@ export async function renderProviderPage(env: Env, provider: Provider): Promise<
     ],
   };
   const jsonld: object[] = [breadcrumb, faq];
-  // Only announce a disruption when there genuinely is one (no-fake-news).
-  if (level !== "operational" && level !== "unknown" && level !== "maintenance") {
+  // Only announce a disruption when there genuinely is one AND the feed is fresh
+  // (no-fake-news — don't broadcast a structured disruption from stale data).
+  if (!stale && level !== "operational" && level !== "unknown" && level !== "maintenance") {
     jsonld.push({
       "@context": "https://schema.org",
       "@type": "SpecialAnnouncement",
@@ -206,7 +220,7 @@ export async function renderProviderPage(env: Env, provider: Provider): Promise<
   const upDown = level === "operational" ? "operational" : (level === "unknown" ? "status" : LABEL[level].toLowerCase());
   return shell({
     title: `Is ${provider.name} down? ${provider.name} status & incidents · Outage Observer`,
-    description: `Check if ${provider.name} is down right now. Live ${provider.name} status (currently ${upDown}), recent incidents and status changes — updated every minute by Outage Observer.`,
+    description: `Check if ${provider.name} is down right now. Live ${provider.name} status (${stale ? "last reported" : "currently"} ${upDown}), recent incidents and status changes — updated every minute by Outage Observer.`,
     canonical,
     jsonld,
     body,
@@ -329,7 +343,9 @@ export async function handleSeo(env: Env, url: URL): Promise<Response | null> {
     return html(await renderDirectory(env));
   }
   if (path.startsWith("/status/")) {
-    const id = decodeURIComponent(path.slice("/status/".length).replace(/\/$/, ""));
+    let id: string;
+    try { id = decodeURIComponent(path.slice("/status/".length).replace(/\/$/, "")); }
+    catch { return new Response(notFoundPage(), { status: 404, headers: { "content-type": "text/html; charset=utf-8" } }); }
     const provider = BY_ID.get(id);
     if (!provider) {
       return new Response(notFoundPage(), { status: 404, headers: { "content-type": "text/html; charset=utf-8" } });

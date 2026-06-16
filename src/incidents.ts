@@ -29,6 +29,7 @@ export async function fetchRecentIncidents(provider: Provider, max = 5): Promise
     const res = await fetch(`${provider.url}/api/v2/incidents.json`, {
       headers: { "user-agent": "OutageObserver/0.1 (+https://outage.observer)" },
       cf: { cacheTtl: 3600, cacheEverything: true },
+      signal: AbortSignal.timeout(8000),
     });
     if (!res.ok) return [];
     const data = await res.json<any>();
@@ -41,7 +42,9 @@ export async function fetchRecentIncidents(provider: Provider, max = 5): Promise
         level: IMPACT_LEVEL[String(i?.impact ?? "none")] ?? "degraded",
         at,
         resolved,
-        url: i?.shortlink ? String(i.shortlink) : undefined,
+        // Only keep https links — a malicious/compromised feed could otherwise
+        // supply a `javascript:` shortlink that we'd render as a clickable href.
+        url: /^https:\/\//i.test(String(i?.shortlink ?? "")) ? String(i.shortlink) : undefined,
       };
     });
   } catch {

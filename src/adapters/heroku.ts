@@ -13,6 +13,8 @@ export async function fetchHeroku(url: string): Promise<ProviderStatus> {
   const res = await fetch(url, {
     headers: { "user-agent": "OutageObserver/0.1 (+https://outage.observer)" },
     cf: { cacheTtl: 30, cacheEverything: true },
+    signal: AbortSignal.timeout(8000),   // a hung provider must not stall the tick
+
   });
   if (!res.ok) return { level: "unknown", description: `HTTP ${res.status}`, incidents: [] };
 

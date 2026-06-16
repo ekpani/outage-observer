@@ -47,6 +47,10 @@ CREATE TABLE IF NOT EXISTS history (
 
 -- Per-provider timeline lookups for uptime / incident queries.
 CREATE INDEX IF NOT EXISTS idx_history_provider_at ON history (provider_id, at);
+-- Global feed ordering (getHistory with no provider filter, e.g. /feed.xml) sorts
+-- by `at` alone; without this it's a full-table scan + filesort on a table built
+-- to grow for years.
+CREATE INDEX IF NOT EXISTS idx_history_at ON history (at);
 
 -- Small key/value table for poll metadata, e.g. the last-checked timestamp, so
 -- the board can show "checked <fresh>" without a per-minute KV write (the board
