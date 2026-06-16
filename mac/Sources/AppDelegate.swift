@@ -55,6 +55,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Start Sparkle (scheduled background update checks).
         _ = UpdaterManager.shared
 
+        // The poll loop is paused while the Mac sleeps, so the menu bar can be
+        // minutes stale the instant the lid opens — refresh immediately on wake.
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
+        ) { _ in
+            Task { @MainActor in await StatusStore.shared.refresh() }
+        }
+
         let pop = NSPopover()
         pop.behavior = .transient                 // closes on click-outside
         pop.animates = true
@@ -119,6 +127,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func updateIcon() {
         guard let button = statusItem?.button else { return }
         button.contentTintColor = nil
+        button.toolTip = tooltipText()
 
         // The scope is a TEMPLATE image, so the system colours it to match every
         // other menu-bar icon — black on a light (wallpaper-driven) bar, white on
@@ -127,8 +136,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // separate layer pinned to the scope's exact centre, so the ring adapts.
         button.image = menuBarScope()
 
+        // When the data is stale (poller stalled / offline >10 min) we can't
+        // vouch for it — show a muted grey pupil instead of a confident colour,
+        // so the menu bar never reads "all clear" over old data.
+        let tint: NSColor? = store.isStale ? NSColor(hex: 0x9AA0A6) : menuBarTint(store.worst)
         let dot = ensurePupilLayer(on: button)
-        if let tint = menuBarTint(store.worst) {
+        if let tint {
             let s: CGFloat = 5
             dot.bounds = CGRect(x: 0, y: 0, width: s, height: s)
             dot.cornerRadius = s / 2
@@ -139,6 +152,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             dot.isHidden = true
         }
+    }
+
+    /// Live one-liner shown on hover, so a glance (no click) reads the state.
+    private func tooltipText() -> String {
+        let head: String
+        if store.neverReached {
+            head = "can't reach outage.observer"
+        } else if store.isStale {
+            head = "status may be stale"
+        } else {
+            let n = store.attentionCount
+            head = n == 0 ? "all clear" : "\(n) need\(n == 1 ? "s" : "") attention"
+        }
+        var s = "Outage Observer · \(head)"
+        if let d = store.checkedAt {
+            let f = DateFormatter()
+            f.dateFormat = "HH:mm"
+            f.timeZone = TimeZone(identifier: "UTC")
+            s += " · \(store.isStale ? "last checked" : "checked") \(f.string(from: d)) UTC"
+        }
+        return s
     }
 
     private func ensurePupilLayer(on button: NSStatusBarButton) -> CALayer {

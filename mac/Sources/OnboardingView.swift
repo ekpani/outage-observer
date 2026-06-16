@@ -239,6 +239,7 @@ private struct ReadyStep: View {
 
     @StateObject private var launch = LaunchAtLogin()
     @State private var notifGranted = false
+    @State private var notifDenied = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -253,10 +254,20 @@ private struct ReadyStep: View {
 
             VStack(spacing: 12) {
                 toggleCard(icon: "bell.badge.fill", on: notifGranted,
-                           title: notifGranted ? "Notifications on" : "Enable notifications",
-                           sub: "The whole point — a ping the moment a service changes") {
+                           title: notifGranted ? "Notifications on" : (notifDenied ? "Notifications blocked" : "Enable notifications"),
+                           sub: notifDenied ? "Blocked in System Settings — tap to open"
+                                            : "The whole point — a ping the moment a service changes") {
                     guard !notifGranted else { return }
-                    NotificationManager.shared.requestAuthorization { notifGranted = $0 }
+                    // Once macOS has denied, re-requesting silently no-ops — send
+                    // the user to System Settings instead so they aren't stuck.
+                    if notifDenied {
+                        NotificationManager.shared.openSystemNotificationSettings()
+                        return
+                    }
+                    NotificationManager.shared.requestAuthorization { granted in
+                        notifGranted = granted
+                        if !granted { NotificationManager.shared.isDenied { notifDenied = $0 } }
+                    }
                 }
                 toggleCard(icon: "power", on: launch.enabled,
                            title: launch.enabled ? "Launches at login" : "Launch at login",
@@ -278,7 +289,10 @@ private struct ReadyStep: View {
             }
             .padding(.horizontal, 28).padding(.bottom, 32)
         }
-        .onAppear { NotificationManager.shared.isAuthorized { notifGranted = $0 } }
+        .onAppear {
+            NotificationManager.shared.isAuthorized { notifGranted = $0 }
+            NotificationManager.shared.isDenied { notifDenied = $0 }
+        }
     }
 
     private func toggleCard(icon: String, on: Bool, title: String, sub: String, action: @escaping () -> Void) -> some View {

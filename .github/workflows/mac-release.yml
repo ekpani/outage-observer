@@ -124,8 +124,13 @@ jobs:
           STAGE="$RUNNER_TEMP/appcast-stage"
           mkdir -p "$STAGE"
           cp "Outage-Observer.dmg" "$STAGE/"
+          # Release notes for THIS version: generate_appcast embeds the file whose
+          # basename matches the archive (Outage-Observer.dmg -> Outage-Observer.md)
+          # as the item's <description>, shown in the Sparkle update dialog.
+          if [ -f "RELEASE_NOTES.md" ]; then cp "RELEASE_NOTES.md" "$STAGE/Outage-Observer.md"; fi
           printf '%s' "$SPARKLE_ED_PRIVATE_KEY" | "$GA" \
             --ed-key-file - \
+            --embed-release-notes \
             --download-url-prefix "https://github.com/${{ github.repository }}/releases/download/mac-latest/" \
             --link "https://outage.observer/mac" \
             "$STAGE"

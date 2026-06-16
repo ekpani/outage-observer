@@ -61,16 +61,43 @@ struct MenuContentView: View {
     }
 
     private var statusLine: some View {
-        let n = store.attentionCount
-        return HStack(spacing: 9) {
-            StatusGlyph(level: n == 0 ? .operational : store.worst, size: 11)
-            Text(n == 0 ? "All clear" : "\(n) need\(n == 1 ? "s" : "") attention")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(n == 0 ? Theme.textSecondary : Theme.status(store.worst))
+        HStack(spacing: 9) {
+            statusSummary
             Spacer()
-            Text(checkedText).font(.mono(10)).foregroundStyle(Theme.textMuted)
+            Text(checkedText).font(.mono(10))
+                .foregroundStyle(store.isStale ? Theme.status(.degraded) : Theme.textMuted)
         }
         .padding(.horizontal, 14).padding(.vertical, 9)
+    }
+
+    // Honesty first: if the feed has gone stale or we can't reach it, say so
+    // instead of showing a confident "All clear" over old data.
+    @ViewBuilder private var statusSummary: some View {
+        if store.neverReached {
+            warnRow("wifi.slash", "Can't reach outage.observer")
+        } else if store.checkedAt == nil {
+            HStack(spacing: 9) {
+                StatusGlyph(level: .unknown, size: 11)
+                Text("Checking…").font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.textSecondary)
+            }
+        } else if store.isStale {
+            warnRow("exclamationmark.triangle.fill", "Status may be stale")
+        } else {
+            let n = store.attentionCount
+            HStack(spacing: 9) {
+                StatusGlyph(level: n == 0 ? .operational : store.worst, size: 11)
+                Text(n == 0 ? "All clear" : "\(n) need\(n == 1 ? "s" : "") attention")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(n == 0 ? Theme.textSecondary : Theme.status(store.worst))
+            }
+        }
+    }
+
+    private func warnRow(_ icon: String, _ text: String) -> some View {
+        HStack(spacing: 9) {
+            Image(systemName: icon).font(.system(size: 11)).foregroundStyle(Theme.status(.degraded))
+            Text(text).font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.status(.degraded))
+        }
     }
 
     @ViewBuilder private var board: some View {
@@ -109,11 +136,11 @@ struct MenuContentView: View {
     }
 
     private var checkedText: String {
-        guard let d = store.checkedAt else { return store.loading ? "checking…" : "—" }
+        guard let d = store.checkedAt else { return store.loading ? "checking…" : "" }
         let f = DateFormatter()
         f.dateFormat = "HH:mm"
         f.timeZone = TimeZone(identifier: "UTC")
-        return "checked \(f.string(from: d)) UTC"
+        return "\(store.isStale ? "last checked" : "checked") \(f.string(from: d)) UTC"
     }
 
     private func iconButton(_ name: String, _ action: @escaping () -> Void) -> some View {

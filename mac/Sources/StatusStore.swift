@@ -120,6 +120,28 @@ final class StatusStore: ObservableObject {
             .max(by: { $0.severity < $1.severity }) ?? .operational
     }
 
+    // MARK: Freshness — never show confident green over old data
+
+    /// Minutes since the snapshot was last refreshed upstream (`meta.checked_at`),
+    /// or `.infinity` if we've never loaded one.
+    var checkedAgeMinutes: Double {
+        guard let d = checkedAt else { return .infinity }
+        return Date().timeIntervalSince(d) / 60
+    }
+
+    /// Don't vouch for the board when the feed hasn't refreshed in >10 min (the
+    /// poller stalled, or we've been offline) — mirrors the web board's guard.
+    /// Before the very first load (no data, no error yet) we stay neutral, not
+    /// stale, so launch doesn't flash a warning.
+    var isStale: Bool {
+        guard checkedAt != nil else { return lastError != nil }
+        return checkedAgeMinutes > 10
+    }
+
+    /// We have never successfully loaded a snapshot and the last fetch failed —
+    /// distinct from "stale" so the UI can say "can't reach" vs "may be old".
+    var neverReached: Bool { checkedAt == nil && lastError != nil }
+
     /// Live level for any catalog id (used by the picker once a snapshot exists).
     func level(for id: String) -> Level { snapshot[id]?.level ?? .unknown }
     func snapshotHas(_ id: String) -> Bool { snapshot[id] != nil }

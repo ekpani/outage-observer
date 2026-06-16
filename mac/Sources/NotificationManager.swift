@@ -27,6 +27,23 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate, @un
         }
     }
 
+    /// True when macOS has explicitly DENIED notifications — re-enabling needs a
+    /// trip to System Settings (re-requesting authorization silently no-ops), so
+    /// the UI surfaces a recovery path for this state.
+    func isDenied(_ completion: @escaping @MainActor (Bool) -> Void) {
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            let denied = settings.authorizationStatus == .denied
+            Task { @MainActor in completion(denied) }
+        }
+    }
+
+    /// Open System Settings straight to this app's Notifications pane.
+    @MainActor func openSystemNotificationSettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
     /// A clearly-fictional sample so the user can preview the alert + its sound.
     func sendTest() {
         requestAuthorization { granted in

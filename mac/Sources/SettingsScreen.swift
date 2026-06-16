@@ -5,6 +5,7 @@ struct SettingsScreen: View {
     @EnvironmentObject var store: StatusStore
     @StateObject private var launch = LaunchAtLogin()
     @State private var confirmReset = false
+    @State private var notifDenied = false
 
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
@@ -19,6 +20,11 @@ struct SettingsScreen: View {
                 VStack(alignment: .leading, spacing: 0) {
                     group("Alerts")
                     toggleRow("Notify on status changes", isOn: $store.notificationsEnabled)
+                    if notifDenied {
+                        warnRow("Notifications are blocked in System Settings") {
+                            NotificationManager.shared.openSystemNotificationSettings()
+                        }
+                    }
                     toggleRow("Launch at login", isOn: $launch.enabled)
                     tapRow("Send a test notification") { NotificationManager.shared.sendTest() }
 
@@ -53,6 +59,7 @@ struct SettingsScreen: View {
                     group("About")
                     infoRow("Version", appVersion)
                     tapRow("Check for updates…") { UpdaterManager.shared.checkForUpdates() }
+                    linkRow("Support & FAQ", "https://outage.observer/support")
                     linkRow("outage.observer", "https://outage.observer")
                     linkRow("Source on GitHub", "https://github.com/ekpani/outage-observer")
                 }
@@ -74,6 +81,21 @@ struct SettingsScreen: View {
         } message: {
             Text("Clears the services you watch and your preferences, then restarts onboarding.")
         }
+        .onAppear { NotificationManager.shared.isDenied { notifDenied = $0 } }
+    }
+
+    private func warnRow(_ label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.triangle.fill").font(.system(size: 11))
+                Text(label).font(.system(size: 12))
+                Spacer()
+                Image(systemName: "arrow.up.right").font(.system(size: 10))
+            }
+            .foregroundStyle(Theme.status(.degraded))
+            .padding(.horizontal, 14).padding(.vertical, 9).contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     private func group(_ title: String) -> some View {
