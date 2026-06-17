@@ -32,8 +32,12 @@ const RINGS = `<svg width="640" height="640" viewBox="0 0 640 640" style="positi
   <circle cx="320" cy="320" r="34" fill="#3FCF5E" opacity="0.22"/>
 </svg>`;
 
+// satori renders text literally (it does NOT decode HTML entities), so we must
+// never emit entities — `&amp;` would show verbatim. Card text is trusted
+// catalog/copy, so just drop angle brackets that would confuse the satori-html
+// parse and leave `&` as a literal ampersand.
 function esc(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return s.replace(/[<>]/g, "");
 }
 
 function card(title: string, subtitle: string, footer: string): string {
@@ -74,7 +78,7 @@ async function main() {
 
   // Default / directory card.
   if (!only.length || only.includes("default")) {
-    await render("default", card("Is your stack up?", "Live status of the infra & AI providers you run on", "outage.observer · 106 providers"));
+    await render("default", card("Is your stack up?", "Live status of the infra & AI providers you run on", `outage.observer · ${CATALOG.length} providers`));
   }
 
   const targets = only.length ? CATALOG.filter((p) => only.includes(p.id)) : CATALOG;
