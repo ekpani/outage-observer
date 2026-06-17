@@ -7,6 +7,7 @@ const CATEGORY_ORDER = [
   "Cloud & hosting", "AI & model providers", "Dev & CI", "Data & backend",
   "Payments", "Comms", "CDN & edge", "Auth & identity", "Collaboration",
   "Monitoring", "Commerce & CMS", "Analytics",
+  "Social & community", "Gaming & streaming", "Finance & crypto", "Consumer & lifestyle",
 ];
 
 const LABELS = {
@@ -46,7 +47,9 @@ const SLUGS = {
   gcp: "googlecloud", aws: "amazonwebservices", azure: "microsoftazure",
   fly: "flydotio", travis: "travisci", cockroach: "cockroachlabs",
   onepassword: "1password", monday: "mondaydotcom", getstream: "stream",
+  wikimedia: "wikipedia", proton: "protonmail", epicgames: "epicgames",
 };
+
 
 const STACK_KEY = "oo-stack";
 const THEME_KEY = "oo-theme";

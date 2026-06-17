@@ -36,6 +36,10 @@ const CAT_EMOJI: Record<string, string> = {
   "Monitoring": "📈",
   "Commerce & CMS": "🛒",
   "Analytics": "📊",
+  "Social & community": "👥",
+  "Gaming & streaming": "🎮",
+  "Finance & crypto": "💰",
+  "Consumer & lifestyle": "🛍",
 };
 
 const SEARCH_LIMIT = 8;

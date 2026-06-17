@@ -92,6 +92,7 @@ let categoryOrder: [String] = [
     "Cloud & hosting", "AI & model providers", "Dev & CI", "Data & backend",
     "Payments", "Comms", "CDN & edge", "Auth & identity", "Collaboration",
     "Monitoring", "Commerce & CMS", "Analytics",
+    "Social & community", "Gaming & streaming", "Finance & crypto", "Consumer & lifestyle",
 ]
 
 /// Static catalog metadata, indexed (live status overlays from /api/status).

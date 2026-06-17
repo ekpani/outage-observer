@@ -80,12 +80,12 @@ export const CATALOG: Provider[] = [
   { id: "plaid", name: "Plaid", category: "Payments", adapter: "statuspage", url: "https://status.plaid.com" },
   { id: "mollie", name: "Mollie", category: "Payments", adapter: "instatus", url: "https://status.mollie.com" },
   { id: "chargebee", name: "Chargebee", category: "Payments", adapter: "statuspage", url: "https://status.chargebee.com" },
-  { id: "coinbase", name: "Coinbase", category: "Payments", adapter: "statuspage", url: "https://status.coinbase.com" },
+  { id: "coinbase", name: "Coinbase", category: "Finance & crypto", adapter: "statuspage", url: "https://status.coinbase.com" },
 
   // Comms
   { id: "twilio", name: "Twilio", category: "Comms", adapter: "statuspage", url: "https://status.twilio.com" },
   { id: "sendgrid", name: "SendGrid", category: "Comms", adapter: "statuspage", url: "https://status.sendgrid.com" },
-  { id: "discord", name: "Discord", category: "Comms", adapter: "statuspage", url: "https://discordstatus.com" },
+  { id: "discord", name: "Discord", category: "Social & community", adapter: "statuspage", url: "https://discordstatus.com" },
   { id: "zoom", name: "Zoom", category: "Comms", adapter: "statuspage", url: "https://status.zoom.us" },
   { id: "slack", name: "Slack", category: "Comms", adapter: "slack", url: "https://slack-status.com/api/v2.0.0/current", link: "https://slack-status.com" },
   { id: "mailgun", name: "Mailgun", category: "Comms", adapter: "statuspage", url: "https://status.mailgun.com" },
@@ -155,6 +155,34 @@ export const CATALOG: Provider[] = [
   { id: "amplitude", name: "Amplitude", category: "Analytics", adapter: "statuspage", url: "https://status.amplitude.com" },
   { id: "mixpanel", name: "Mixpanel", category: "Analytics", adapter: "statuspage", url: "https://www.mixpanelstatus.com" },
   { id: "segment", name: "Segment", category: "Analytics", adapter: "statuspage", url: "https://status.segment.com" },
+
+  // Networking (grouped with cloud/infra).
+  { id: "tailscale", name: "Tailscale", category: "Cloud & hosting", adapter: "statuspage", url: "https://status.tailscale.com" },
+
+  // Social & community
+  { id: "reddit", name: "Reddit", category: "Social & community", adapter: "statuspage", url: "https://www.redditstatus.com" },
+  { id: "pinterest", name: "Pinterest", category: "Social & community", adapter: "statuspage", url: "https://status.pinterest.com" },
+  { id: "medium", name: "Medium", category: "Social & community", adapter: "statuspage", url: "https://medium.statuspage.io" },
+  { id: "wikimedia", name: "Wikimedia", category: "Social & community", adapter: "statuspage", url: "https://www.wikimediastatus.net" },
+  { id: "patreon", name: "Patreon", category: "Social & community", adapter: "statuspage", url: "https://status.patreon.com" },
+
+  // Gaming & streaming
+  { id: "twitch", name: "Twitch", category: "Gaming & streaming", adapter: "statuspage", url: "https://status.twitch.tv" },
+  { id: "epicgames", name: "Epic Games", category: "Gaming & streaming", adapter: "statuspage", url: "https://status.epicgames.com" },
+
+  // Finance & crypto
+  { id: "robinhood", name: "Robinhood", category: "Finance & crypto", adapter: "statuspage", url: "https://status.robinhood.com" },
+  { id: "kraken", name: "Kraken", category: "Finance & crypto", adapter: "statuspage", url: "https://status.kraken.com" },
+  { id: "cashapp", name: "Cash App", category: "Finance & crypto", adapter: "statuspage", url: "https://status.cash.app" },
+  { id: "wise", name: "Wise", category: "Finance & crypto", adapter: "statuspage", url: "https://status.wise.com" },
+
+  // Consumer & lifestyle
+  { id: "dropbox", name: "Dropbox", category: "Consumer & lifestyle", adapter: "statuspage", url: "https://status.dropbox.com" },
+  { id: "doordash", name: "DoorDash", category: "Consumer & lifestyle", adapter: "statuspage", url: "https://www.doordashstatus.com" },
+  { id: "grammarly", name: "Grammarly", category: "Consumer & lifestyle", adapter: "statuspage", url: "https://status.grammarly.com" },
+  { id: "duolingo", name: "Duolingo", category: "Consumer & lifestyle", adapter: "statuspage", url: "https://status.duolingo.com" },
+  { id: "proton", name: "Proton", category: "Consumer & lifestyle", adapter: "statuspage", url: "https://status.proton.me" },
+  { id: "strava", name: "Strava", category: "Consumer & lifestyle", adapter: "statuspage", url: "https://status.strava.com" },
 ];
 
 /** INTERNAL polling-freshness set only — NOT a user-facing "essentials" list.
@@ -180,4 +208,5 @@ export const CATEGORY_ORDER: string[] = [
   "Cloud & hosting", "AI & model providers", "Dev & CI", "Data & backend",
   "Payments", "Comms", "CDN & edge", "Auth & identity", "Collaboration",
   "Monitoring", "Commerce & CMS", "Analytics",
+  "Social & community", "Gaming & streaming", "Finance & crypto", "Consumer & lifestyle",
 ];
