@@ -2,12 +2,17 @@
 // standard VAPID/aes128gcm) + a small offline shell cache so the installed app
 // launches even with no network (live status still needs the network).
 
-const CACHE = "oo-shell-v1";
+const CACHE = "oo-shell-v2";
 const SHELL = ["/", "/app.js", "/board.css", "/tokens.css", "/favicon.svg", "/icon-192.png"];
 
 self.addEventListener("install", (event) => {
+  // Precache the shell FRESH (cache:"reload" bypasses any stale HTTP cache), so a
+  // new SW version always seeds the current assets.
   event.waitUntil(
-    caches.open(CACHE).then((c) => c.addAll(SHELL)).catch(() => {}).then(() => self.skipWaiting()),
+    caches.open(CACHE)
+      .then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: "reload" }))))
+      .catch(() => {})
+      .then(() => self.skipWaiting()),
   );
 });
 
