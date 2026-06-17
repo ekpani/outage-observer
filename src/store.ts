@@ -1,6 +1,7 @@
 import { sendMessage, type Env } from "./telegram";
 import type { Level } from "./adapters";
 import { deliver, type AlertEvent } from "./channels";
+import { parsePrefs } from "./regions";
 
 const BOARD_KEY = "board";
 
@@ -218,35 +219,43 @@ export async function commitProviderStates(
 // handful of subrequests regardless of how many providers transitioned or how
 // many subscribers watch them — it can never blow the 50-subrequest budget.
 
-export async function getSubscribersForProviders(env: Env, providerIds: string[]): Promise<Map<string, number[]>> {
-  if (!providerIds.length) return new Map();
-  const ph = providerIds.map(() => "?").join(",");
-  const { results } = await env.DB
-    .prepare(`SELECT provider_id, chat_id FROM subscriptions WHERE provider_id IN (${ph})`)
-    .bind(...providerIds)
-    .all<{ provider_id: string; chat_id: number }>();
-  const map = new Map<string, number[]>();
-  for (const r of results) {
-    const arr = map.get(r.provider_id);
-    if (arr) arr.push(r.chat_id); else map.set(r.provider_id, [r.chat_id]);
-  }
-  return map;
-}
+/** A subscriber with their region preference (empty = all regions). */
+export interface Subscriber { chatId: number; prefs: string[] }
 
-export async function getTargetsForProviders(env: Env, providerIds: string[]): Promise<Map<string, Target[]>> {
+export async function getSubscribersForProviders(env: Env, providerIds: string[]): Promise<Map<string, Subscriber[]>> {
   if (!providerIds.length) return new Map();
   const ph = providerIds.map(() => "?").join(",");
   const { results } = await env.DB
     .prepare(
-      `SELECT s.provider_id, t.id, t.channel, t.address, t.meta
+      `SELECT s.provider_id, s.chat_id, u.regions
+       FROM subscriptions s LEFT JOIN users u ON u.chat_id = s.chat_id
+       WHERE s.provider_id IN (${ph})`,
+    )
+    .bind(...providerIds)
+    .all<{ provider_id: string; chat_id: number; regions: string | null }>();
+  const map = new Map<string, Subscriber[]>();
+  for (const r of results) {
+    const sub: Subscriber = { chatId: r.chat_id, prefs: parsePrefs(r.regions) };
+    const arr = map.get(r.provider_id);
+    if (arr) arr.push(sub); else map.set(r.provider_id, [sub]);
+  }
+  return map;
+}
+
+export async function getTargetsForProviders(env: Env, providerIds: string[]): Promise<Map<string, (Target & { prefs: string[] })[]>> {
+  if (!providerIds.length) return new Map();
+  const ph = providerIds.map(() => "?").join(",");
+  const { results } = await env.DB
+    .prepare(
+      `SELECT s.provider_id, t.id, t.channel, t.address, t.meta, t.regions
        FROM target_subs s JOIN targets t ON t.id = s.target_id
        WHERE s.provider_id IN (${ph})`,
     )
     .bind(...providerIds)
-    .all<{ provider_id: string; id: number; channel: string; address: string; meta: string | null }>();
-  const map = new Map<string, Target[]>();
+    .all<{ provider_id: string; id: number; channel: string; address: string; meta: string | null; regions: string | null }>();
+  const map = new Map<string, (Target & { prefs: string[] })[]>();
   for (const r of results) {
-    const target: Target = { id: r.id, channel: r.channel, address: r.address, meta: r.meta };
+    const target = { id: r.id, channel: r.channel, address: r.address, meta: r.meta, prefs: parsePrefs(r.regions) };
     const arr = map.get(r.provider_id);
     if (arr) arr.push(target); else map.set(r.provider_id, [target]);
   }
@@ -324,18 +333,32 @@ export async function upsertTarget(
   channel: string,
   address: string,
   meta: string | null,
+  regions: string | null = null,
 ): Promise<{ id: number; token: string }> {
   const token = crypto.randomUUID();
   const row = await env.DB
     .prepare(
-      `INSERT INTO targets (channel, address, meta, token, created_at)
-       VALUES (?, ?, ?, ?, ?)
-       ON CONFLICT(channel, address) DO UPDATE SET meta = excluded.meta
+      `INSERT INTO targets (channel, address, meta, token, created_at, regions)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(channel, address) DO UPDATE SET meta = excluded.meta, regions = excluded.regions
        RETURNING id, token`,
     )
-    .bind(channel, address, meta, token, Date.now())
+    .bind(channel, address, meta, token, Date.now(), regions)
     .first<{ id: number; token: string }>();
   return row ?? { id: 0, token };
+}
+
+/** A user's region preference (empty = all regions). Telegram /regions sets it. */
+export async function setUserRegions(env: Env, chatId: number, regions: string[]): Promise<void> {
+  await env.DB
+    .prepare("INSERT INTO users (chat_id, regions) VALUES (?, ?) ON CONFLICT(chat_id) DO UPDATE SET regions = excluded.regions")
+    .bind(chatId, regions.join(","))
+    .run();
+}
+
+export async function getUserRegions(env: Env, chatId: number): Promise<string[]> {
+  const row = await env.DB.prepare("SELECT regions FROM users WHERE chat_id = ?").bind(chatId).first<{ regions: string | null }>();
+  return parsePrefs(row?.regions);
 }
 
 /** Replace a target's watched providers (deduped). */

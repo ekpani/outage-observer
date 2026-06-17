@@ -2,6 +2,7 @@ import { CATALOG, CATEGORY_ORDER, POPULAR_IDS, type Provider } from "./catalog";
 import { type Level } from "./adapters";
 import { EMOJI, LABEL } from "./labels";
 import { formatAlert } from "./poller";
+import { GEOS, GEO_LABEL, type Geo } from "./regions";
 import {
   getBoard,
   getWatch,
@@ -10,6 +11,8 @@ import {
   clearWatch,
   addUser,
   removeUser,
+  getUserRegions,
+  setUserRegions,
 } from "./store";
 import {
   sendMessage,
@@ -87,10 +90,35 @@ function welcomeKeyboard(watch: Set<string>): InlineKeyboard {
   }
   if (row.length) rows.push(row);
   rows.push([{ text: "🔎 Browse all by category", callback_data: "cats" }]);
+  rows.push([{ text: "🌍 Regions", callback_data: "regions" }]);
   const last: InlineButton[] = [{ text: "✓ Done", callback_data: "done" }];
   if (watch.size) last.unshift({ text: "🧹 Clear", callback_data: "clr" });
   rows.push(last);
   return { inline_keyboard: rows };
+}
+
+function regionsKeyboard(prefs: Set<string>): InlineKeyboard {
+  const rows: InlineButton[][] = [];
+  let row: InlineButton[] = [];
+  for (const g of GEOS) {
+    row.push({ text: `${tile(prefs.has(g))} ${GEO_LABEL[g]}`, callback_data: `rg:${g}` });
+    if (row.length === 2) { rows.push(row); row = []; }
+  }
+  if (row.length) rows.push(row);
+  rows.push([{ text: prefs.size ? "🌐 Notify me everywhere (clear)" : "✓ Everywhere", callback_data: "rg-all" }]);
+  rows.push([{ text: "‹ Back", callback_data: "welcome" }]);
+  return { inline_keyboard: rows };
+}
+
+function regionsText(prefs: Set<string>): string {
+  const sel = prefs.size ? [...prefs].map((g) => GEO_LABEL[g as Geo] ?? g).join(", ") : "Everywhere";
+  return (
+    "🌍  <b>Regions</b>\n\n" +
+    "For providers that report a location (Google Cloud, AWS), I'll only ping you about incidents in the regions you pick. " +
+    "Global or unspecified incidents always come through.\n\n" +
+    `Currently notifying: <b>${esc(sel)}</b>\n\n` +
+    "Tap to toggle. Pick none to be notified everywhere."
+  );
 }
 
 function categoriesKeyboard(watch: Set<string>): InlineKeyboard {
@@ -250,6 +278,11 @@ async function handleMessage(env: Env, message: any): Promise<void> {
     case "/search":
       await runSearch(env, chatId, arg);
       break;
+    case "/regions": {
+      const prefs = new Set(await getUserRegions(env, chatId));
+      await sendMessage(env, chatId, regionsText(prefs), regionsKeyboard(prefs));
+      break;
+    }
     case "/status":
       await sendMessage(env, chatId, await statusText(env, chatId));
       break;
@@ -320,6 +353,21 @@ async function handleCallback(env: Env, cq: any): Promise<void> {
 
   if (data === "welcome") {
     await editMessageText(env, chatId, messageId, welcomeText(watch.size), welcomeKeyboard(watch));
+    await answerCallback(env, cq.id);
+  } else if (data === "regions") {
+    const prefs = new Set(await getUserRegions(env, chatId));
+    await editMessageText(env, chatId, messageId, regionsText(prefs), regionsKeyboard(prefs));
+    await answerCallback(env, cq.id);
+  } else if (data === "rg-all") {
+    await setUserRegions(env, chatId, []);
+    await editMessageText(env, chatId, messageId, regionsText(new Set()), regionsKeyboard(new Set()));
+    await answerCallback(env, cq.id, "Notifying everywhere");
+  } else if (data.startsWith("rg:")) {
+    const g = data.slice(3);
+    const prefs = new Set(await getUserRegions(env, chatId));
+    if (prefs.has(g)) prefs.delete(g); else prefs.add(g);
+    await setUserRegions(env, chatId, [...prefs]);
+    await editMessageText(env, chatId, messageId, regionsText(prefs), regionsKeyboard(prefs));
     await answerCallback(env, cq.id);
   } else if (data === "cats") {
     await editMessageText(env, chatId, messageId, categoriesText(watch), categoriesKeyboard(watch));

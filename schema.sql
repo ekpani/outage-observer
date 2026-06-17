@@ -5,9 +5,11 @@
 -- Apply with:
 --   npx wrangler d1 execute outage-observer --remote --file=schema.sql
 
--- Telegram subscribers (one row per chat).
+-- Telegram subscribers (one row per chat). `regions` = comma-joined coarse geos
+-- the user wants alerts for (NULL/empty = all regions).
 CREATE TABLE IF NOT EXISTS users (
-  chat_id INTEGER PRIMARY KEY
+  chat_id INTEGER PRIMARY KEY,
+  regions TEXT
 );
 
 -- A user's watch list: which providers they want alerts for.
@@ -86,7 +88,8 @@ CREATE TABLE IF NOT EXISTS targets (
   address    TEXT    NOT NULL,            -- push endpoint URL, or webhook URL
   meta       TEXT,                        -- JSON (web-push keys {p256dh,auth}); else NULL
   token      TEXT    NOT NULL,            -- opaque manage/unsubscribe token
-  created_at INTEGER NOT NULL
+  created_at INTEGER NOT NULL,
+  regions    TEXT                         -- comma-joined coarse geos (NULL/empty = all)
 );
 -- One target per (channel, address); re-subscribing updates it.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_targets_addr ON targets (channel, address);

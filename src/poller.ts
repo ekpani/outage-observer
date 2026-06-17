@@ -4,7 +4,7 @@ import { getBoard, setBoard, setCheckedAt, drainOutbox, drainTargetOutbox, getPr
 import { type AlertEvent } from "./channels";
 import { type Env } from "./telegram";
 import { EMOJI, LABEL } from "./labels";
-import { regionLabel } from "./regions";
+import { regionLabel, shouldAlert } from "./regions";
 
 interface Transition {
   id: string;
@@ -131,30 +131,37 @@ async function fanOut(env: Env, transitions: Transition[]): Promise<void> {
   const ids = transitions.map((t) => t.id);
   await recordHistoryBatch(env, transitions.map((t) => ({ id: t.id, level: t.to })));
 
-  // Telegram subscribers.
+  // Telegram subscribers — region-filtered (fail-safe: empty prefs or a
+  // global/unknown-scope incident always alerts).
   const subs = await getSubscribersForProviders(env, ids);
   const notifRows: { chatId: number; text: string }[] = [];
   for (const t of transitions) {
+    const regions = t.status.regions ?? [];
     const text = formatAlert(t.name, t.from, t.to, t.status);
-    for (const chatId of subs.get(t.id) ?? []) notifRows.push({ chatId, text });
+    for (const s of subs.get(t.id) ?? []) {
+      if (shouldAlert(s.prefs, regions)) notifRows.push({ chatId: s.chatId, text });
+    }
   }
   await enqueueNotificationsBatch(env, notifRows);
 
-  // Non-Telegram targets (web push, Slack/Discord).
+  // Non-Telegram targets (web push, Slack/Discord) — same region filter.
   const targetsByProvider = await getTargetsForProviders(env, ids);
   const homeById = new Map(CATALOG.map((p) => [p.id, p.link ?? p.url] as const));
   const eventRows: { targetId: number; payload: string }[] = [];
   for (const t of transitions) {
+    const regions = t.status.regions ?? [];
     const targets = targetsByProvider.get(t.id);
     if (!targets?.length) continue;
     const event: AlertEvent = {
       id: t.id, name: t.name, level: t.to, from: t.from,
       url: homeById.get(t.id) ?? "https://outage.observer/",
       incident: t.status.incidents[0]?.name,
-      regions: t.status.regions ?? [],
+      regions,
     };
     const payload = JSON.stringify(event);
-    for (const target of targets) eventRows.push({ targetId: target.id, payload });
+    for (const target of targets) {
+      if (shouldAlert(target.prefs, regions)) eventRows.push({ targetId: target.id, payload });
+    }
   }
   await enqueueTargetEventsBatch(env, eventRows);
 }

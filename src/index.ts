@@ -7,6 +7,12 @@ import { handleFeed } from "./feed";
 import { handleSeo } from "./seo";
 import { detectWebhookKind, sendWebhookConfirmation } from "./channels";
 import { CATALOG } from "./catalog";
+import { isGeo } from "./regions";
+
+/** Validated coarse-geo list from a subscribe body (empty = all regions). */
+function bodyRegions(body: { regions?: unknown }): string[] {
+  return Array.isArray(body?.regions) ? (body.regions as unknown[]).map(String).filter(isGeo) : [];
+}
 
 const PROVIDER_IDS = new Set(CATALOG.map((p) => p.id));
 
@@ -134,7 +140,7 @@ export default {
 
     // Register / refresh a browser push subscription against a set of providers.
     if (url.pathname === "/api/push/subscribe" && request.method === "POST") {
-      let body: { subscription?: { endpoint?: string; keys?: { p256dh?: string; auth?: string } }; providers?: unknown };
+      let body: { subscription?: { endpoint?: string; keys?: { p256dh?: string; auth?: string } }; providers?: unknown; regions?: unknown };
       try { body = await request.json(); } catch { return json({ error: "Bad JSON." }, 400); }
       const sub = body?.subscription;
       const endpoint = String(sub?.endpoint ?? "");
@@ -146,8 +152,9 @@ export default {
       const valid = new Set(CATALOG.map((p) => p.id));
       const providers = Array.isArray(body?.providers) ? (body.providers as unknown[]).map(String).filter((x) => valid.has(x)) : [];
       if (!providers.length) return json({ error: "Start observing at least one service first." }, 400);
+      const regions = bodyRegions(body);
 
-      const { id, token } = await upsertTarget(env, "webpush", endpoint, JSON.stringify({ p256dh, auth }));
+      const { id, token } = await upsertTarget(env, "webpush", endpoint, JSON.stringify({ p256dh, auth }), regions.length ? regions.join(",") : null);
       await setTargetSubs(env, id, providers);
       return json({ ok: true, token, count: providers.length });
     }
@@ -162,7 +169,7 @@ export default {
     // Connect a Slack/Discord incoming webhook to a set of providers (the
     // services the caller is observing). POSTed from the board, same-origin.
     if (url.pathname === "/api/webhook/subscribe" && request.method === "POST") {
-      let body: { url?: string; providers?: unknown };
+      let body: { url?: string; providers?: unknown; regions?: unknown };
       try { body = await request.json(); } catch { return json({ error: "Bad JSON." }, 400); }
       const hookUrl = String(body?.url ?? "").trim();
       const kind = detectWebhookKind(hookUrl);
@@ -170,8 +177,9 @@ export default {
       const valid = new Set(CATALOG.map((p) => p.id));
       const providers = Array.isArray(body?.providers) ? (body.providers as unknown[]).map(String).filter((x) => valid.has(x)) : [];
       if (!providers.length) return json({ error: "Start observing at least one service first." }, 400);
+      const regions = bodyRegions(body);
 
-      const { id, token } = await upsertTarget(env, kind, hookUrl, null);
+      const { id, token } = await upsertTarget(env, kind, hookUrl, null, regions.length ? regions.join(",") : null);
       await setTargetSubs(env, id, providers);
       // Best-effort confirmation; if the endpoint rejects it, undo and report.
       const result = await sendWebhookConfirmation(kind, hookUrl, providers.length).catch(() => "retry" as const);

@@ -2,12 +2,40 @@
 // SAME backend endpoints and the SAME "oo-stack" localStorage as the board, so
 // alerts cover the services you've already picked. No board UI required here.
 (function () {
-  var STACK_KEY = "oo-stack", PUSH_ON = "oo-push-on", PUSH_TOKEN = "oo-push-token";
+  var STACK_KEY = "oo-stack", PUSH_ON = "oo-push-on", PUSH_TOKEN = "oo-push-token", REGIONS_KEY = "oo-regions";
 
   function stack() {
     try { return JSON.parse(localStorage.getItem(STACK_KEY) || "[]"); } catch (e) { return []; }
   }
   function $(id) { return document.getElementById(id); }
+
+  // Region preference (empty = everywhere). Persisted, and sent with every
+  // subscribe so the server filters alerts (global/unknown always come through).
+  function regions() {
+    var out = [], cbs = document.querySelectorAll(".al-region-cb");
+    for (var i = 0; i < cbs.length; i++) if (cbs[i].checked) out.push(cbs[i].value);
+    return out;
+  }
+  function regionState() {
+    var s = $("al-region-state"); if (!s) return;
+    var n = regions().length;
+    s.textContent = n ? ("Notifying about " + n + " region" + (n > 1 ? "s" : "")) : "Notifying everywhere";
+  }
+  function saveRegions() {
+    try { localStorage.setItem(REGIONS_KEY, JSON.stringify(regions())); } catch (e) {}
+    regionState();
+    if (localStorage.getItem(PUSH_ON) === "1") enablePush();   // resync stored regions
+  }
+  function loadRegions() {
+    var saved = [];
+    try { saved = JSON.parse(localStorage.getItem(REGIONS_KEY) || "[]"); } catch (e) {}
+    var cbs = document.querySelectorAll(".al-region-cb");
+    for (var i = 0; i < cbs.length; i++) {
+      cbs[i].checked = saved.indexOf(cbs[i].value) !== -1;
+      cbs[i].addEventListener("change", saveRegions);
+    }
+    regionState();
+  }
   function pushSupported() {
     return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
   }
@@ -58,7 +86,7 @@
         || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64ToU8(key) });
       var res = await fetch("/api/push/subscribe", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ subscription: sub.toJSON(), providers: providers }),
+        body: JSON.stringify({ subscription: sub.toJSON(), providers: providers, regions: regions() }),
       });
       var d = await res.json().catch(function () { return {}; });
       if (res.ok && d.ok) {
@@ -102,7 +130,7 @@
     try {
       var res = await fetch("/api/webhook/subscribe", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ url: url, providers: providers }),
+        body: JSON.stringify({ url: url, providers: providers, regions: regions() }),
       });
       var d = await res.json().catch(function () { return {}; });
       if (res.ok && d.ok) {
@@ -114,6 +142,7 @@
 
   document.addEventListener("DOMContentLoaded", function () {
     refreshStack();
+    loadRegions();
     if (!pushSupported()) { var row = $("al-push-row"); if (row) row.style.display = "none"; }
     var pb = $("al-push-btn");
     if (pb) {

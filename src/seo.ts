@@ -4,7 +4,7 @@ import { getBoard, getCheckedAt, getHistory, type BoardEntry } from "./store";
 import { type Env } from "./telegram";
 import { type Level } from "./adapters";
 import { fetchRecentIncidents } from "./incidents";
-import { regionLabel } from "./regions";
+import { regionLabel, GEOS, GEO_LABEL } from "./regions";
 
 const SITE = "https://outage.observer";
 const BY_ID = new Map(CATALOG.map((p) => [p.id, p] as const));
@@ -573,6 +573,12 @@ function renderAlerts(): string {
   <p class="sp-answer">Switch on the channels you want. Outage Observer pings you only for the services you watch, only when they change.</p>
   <p class="sp-meta" id="al-stack">Loading your services…</p>
 
+  <section>
+    <h2>🌍 Regions <span class="sp-muted">· optional</span></h2>
+    <p>For providers that report a location (Google Cloud, AWS), get alerted only about the regions you depend on. Leave all unchecked to be notified everywhere; global incidents always come through. Applies to browser push and Slack/Discord below.</p>
+    <div class="al-regions" id="al-regions">${GEOS.map((g) => `<label class="al-region"><input type="checkbox" class="al-region-cb" value="${g}" /> ${esc(GEO_LABEL[g])}</label>`).join("")}</div>
+    <span class="al-hint" id="al-region-state"></span>
+  </section>
   <section>
     <h2>🔔 Browser push</h2>
     <p>The fastest way. Notifications arrive even when the tab is closed.</p>
