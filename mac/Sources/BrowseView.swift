@@ -9,7 +9,7 @@ struct BrowseView: View {
     private var results: [CatalogEntry] {
         let q = query.trimmingCharacters(in: .whitespaces).lowercased()
         guard !q.isEmpty else { return [] }
-        return catalog.filter { $0.name.lowercased().contains(q) || $0.id.contains(q) }
+        return store.liveCatalog.filter { $0.name.lowercased().contains(q) || $0.id.contains(q) }
     }
 
     var body: some View {
@@ -27,9 +27,9 @@ struct BrowseView: View {
                             ForEach(observingEntries) { row($0) }
                         }
                         section("Popular", popularIDs.count)
-                        ForEach(popularIDs.compactMap { catalogByID[$0] }) { row($0) }
-                        ForEach(categoryOrder, id: \.self) { cat in
-                            let items = catalogEntries(in: cat)
+                        ForEach(popularIDs.compactMap { store.catalogEntry(for: $0) }) { row($0) }
+                        ForEach(store.liveCategories, id: \.self) { cat in
+                            let items = store.catalogIn(cat)
                             if !items.isEmpty {
                                 section(cat, items.count)
                                 ForEach(items) { row($0) }
@@ -53,13 +53,13 @@ struct BrowseView: View {
     }
 
     private var observingEntries: [CatalogEntry] {
-        store.observing.compactMap { catalogByID[$0] }.sorted { $0.name < $1.name }
+        store.observing.compactMap { store.catalogEntry(for: $0) }.sorted { $0.name < $1.name }
     }
 
     private var searchField: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass").font(.system(size: 12)).foregroundStyle(Theme.textMuted)
-            TextField("Search 106 services…", text: $query)
+            TextField("Search \(store.liveCatalog.count) services…", text: $query)
                 .textFieldStyle(.plain).font(.mono(12)).foregroundStyle(Theme.textPrimary)
         }
         .padding(.horizontal, 11).padding(.vertical, 8)

@@ -108,7 +108,7 @@ private struct ChooseStep: View {
     private var results: [CatalogEntry] {
         let q = query.trimmingCharacters(in: .whitespaces).lowercased()
         guard !q.isEmpty else { return [] }
-        return catalog.filter { $0.name.lowercased().contains(q) || $0.id.contains(q) }
+        return store.liveCatalog.filter { $0.name.lowercased().contains(q) || $0.id.contains(q) }
     }
 
     var body: some View {
@@ -130,8 +130,8 @@ private struct ChooseStep: View {
                         sectionLabel("Popular")
                         FlowChips(ids: popularIDs)
                             .padding(.horizontal, 30).padding(.bottom, 6)
-                        ForEach(categoryOrder, id: \.self) { cat in
-                            let items = catalogEntries(in: cat)
+                        ForEach(store.liveCategories, id: \.self) { cat in
+                            let items = store.catalogIn(cat)
                             if !items.isEmpty {
                                 sectionLabel(cat)
                                 ForEach(items) { e in pickRow(e) }
@@ -157,7 +157,7 @@ private struct ChooseStep: View {
     private var searchField: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass").font(.system(size: 12)).foregroundStyle(Theme.textMuted)
-            TextField("Search 106 services…", text: $query)
+            TextField("Search \(store.liveCatalog.count) services…", text: $query)
                 .textFieldStyle(.plain).font(.mono(12)).foregroundStyle(Theme.textPrimary)
         }
         .padding(.horizontal, 12).padding(.vertical, 9)
@@ -211,7 +211,7 @@ private struct FlowChips: View {
     let ids: [String]
 
     var body: some View {
-        let entries = ids.compactMap { catalogByID[$0] }
+        let entries = ids.compactMap { store.catalogEntry(for: $0) }
         FlexWrap(spacing: 8, lineSpacing: 8) {
             ForEach(entries) { e in
                 let on = store.isObserving(e.id)

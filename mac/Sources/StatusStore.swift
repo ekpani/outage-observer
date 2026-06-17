@@ -156,6 +156,38 @@ final class StatusStore: ObservableObject {
 
     func isObserving(_ id: String) -> Bool { observing.contains(id) }
 
+    // MARK: Live catalog (from /api/status, so newly-added services appear
+    // WITHOUT a Mac update; the bundled catalog is the offline / first-launch
+    // fallback). The board snapshot already carries every provider's id/name/
+    // category, so it is the catalog.
+
+    /// The effective catalog: snapshot providers when loaded, else bundled.
+    var liveCatalog: [CatalogEntry] {
+        guard !snapshot.isEmpty else { return catalog }
+        var out = snapshot.values.map { CatalogEntry(id: $0.id, name: $0.name, category: $0.category) }
+        let seen = Set(out.map(\.id))
+        out += catalog.filter { !seen.contains($0.id) }   // keep any bundled-only ids (safety)
+        return out.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    func catalogEntry(for id: String) -> CatalogEntry? {
+        if let p = snapshot[id] { return CatalogEntry(id: p.id, name: p.name, category: p.category) }
+        return catalogByID[id]
+    }
+
+    func catalogIn(_ category: String) -> [CatalogEntry] {
+        liveCatalog.filter { $0.category == category }
+    }
+
+    /// Bundled category order, then any new server-side categories appended (so a
+    /// new category shows without a Mac update).
+    var liveCategories: [String] {
+        var cats = categoryOrder
+        let known = Set(categoryOrder)
+        for e in liveCatalog where !known.contains(e.category) && !cats.contains(e.category) { cats.append(e.category) }
+        return cats
+    }
+
     func toggle(_ id: String) {
         if observing.contains(id) { observing.remove(id) } else { observing.insert(id) }
     }
