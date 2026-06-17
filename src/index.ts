@@ -1,5 +1,5 @@
 import { poll } from "./poller";
-import { getBoard, getCheckedAt, upsertTarget, setTargetSubs, deleteTargetByToken } from "./store";
+import { getBoard, getCheckedAt, upsertTarget, setTargetSubs, deleteTargetByToken, addSuggestion, getTopSuggestions } from "./store";
 import { type Env } from "./telegram";
 import { onUpdate } from "./bot";
 import { handleIngest } from "./ingest";
@@ -203,6 +203,28 @@ export default {
       return json({ ok: true, kind, token, count: providers.length });
     }
 
+    // Suggest a service to add, or upvote an existing request. Curated: we add
+    // the popular ones to the catalog by hand. Rate-limited + deduped by hashed IP.
+    if (url.pathname === "/api/suggest" && request.method === "POST") {
+      if (oversized(request)) return json({ error: "Payload too large." }, 413);
+      const ip = request.headers.get("cf-connecting-ip") ?? "unknown";
+      const { success } = await env.SUBSCRIBE_LIMIT.limit({ key: "suggest:" + ip });
+      if (!success) return json({ error: "Too many requests. Try again shortly." }, 429);
+      let body: { name?: unknown };
+      try { body = await request.json(); } catch { return json({ error: "Bad JSON." }, 400); }
+      const name = String(body?.name ?? "").trim().replace(/\s+/g, " ");
+      if (name.length < 2 || name.length > 60) return json({ error: "Enter a service name (2 to 60 characters)." }, 400);
+      if (CATALOG.some((p) => p.name.toLowerCase() === name.toLowerCase())) {
+        return json({ already: true, name });
+      }
+      const voter = await sha256hex(ip);
+      const r = await addSuggestion(env, name, voter);
+      return json({ ok: true, ...r });
+    }
+    if (url.pathname === "/api/suggest" && request.method === "GET") {
+      return json({ suggestions: await getTopSuggestions(env, 10) });
+    }
+
     if (url.pathname === "/api/webhook/unsubscribe" && request.method === "POST") {
       let body: { token?: string };
       try { body = await request.json(); } catch { return json({ error: "Bad JSON." }, 400); }
@@ -275,6 +297,12 @@ export default {
     return new Response("not found", { status: 404 });
   },
 };
+
+/** Hex SHA-256, used to hash an IP into an opaque voter key (we never store raw IPs). */
+async function sha256hex(s: string): Promise<string> {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
 
 /** Reject obviously-oversized request bodies before parsing — a cheap
  *  memory-DoS guard on the public POST routes (their JSON is always tiny). A

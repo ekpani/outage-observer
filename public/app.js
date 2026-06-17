@@ -59,6 +59,15 @@ const NOTIFY_DISMISS_KEY = "oo-notify-dismissed";
 
 let BOARD = null;
 let VIEW = null;   // 'board' | 'browse'; null = decide from stack on first render
+let SUGGESTIONS = [];   // most-requested services (crowd-sourced)
+let REQ_DRAFT = "";     // preserve the request input across re-renders
+
+async function loadSuggestions() {
+  try {
+    const r = await fetch("/api/suggest", { cache: "no-store" });
+    SUGGESTIONS = (await r.json()).suggestions || [];
+  } catch (e) { /* leave as-is */ }
+}
 
 function getStack() {
   try { return new Set(JSON.parse(localStorage.getItem(STACK_KEY) || "[]")); } catch { return new Set(); }
@@ -214,7 +223,42 @@ function browseHtml(providers, stack, checked) {
       + `<span class="count mono">${picked ? picked + "/" : ""}${inCat.length}</span><span class="rule"></span></div>`;
     html += inCat.map((p) => rowHtml(p, stack, "browse")).join("");
   }
+  // Crowd-sourced requests: ask for what's missing; we add the popular ones.
+  const top = SUGGESTIONS.length
+    ? '<div class="req-top">Most requested: '
+      + SUGGESTIONS.slice(0, 6).map((s) => `<span class="req-chip">${esc(s.name)} <b>${s.votes}</b></span>`).join("")
+      + '</div>'
+    : "";
+  html += '<div class="req-box">'
+    + '<div class="req-title">Don’t see a service you depend on?</div>'
+    + `<div class="req-row"><input id="req-name" class="req-input" placeholder="Name a service to request…" maxlength="60" value="${esc(REQ_DRAFT)}" />`
+    + `<button class="btn btn-primary" data-act="suggest">Request</button></div>`
+    + '<div class="req-state" id="req-state"></div>'
+    + top
+    + '</div>';
   return html;
+}
+
+async function submitSuggestion() {
+  const input = document.getElementById("req-name");
+  const state = document.getElementById("req-state");
+  const name = (input && input.value || "").trim();
+  if (name.length < 2) { if (state) state.textContent = "Type a service name first."; return; }
+  if (state) state.textContent = "Sending…";
+  try {
+    const r = await fetch("/api/suggest", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: name }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (d.already) { if (state) state.textContent = `${d.name} is already tracked — search for it above.`; }
+    else if (r.ok && d.ok) {
+      REQ_DRAFT = "";
+      if (state) state.textContent = `Thanks — ${d.name} now has ${d.votes} request${d.votes === 1 ? "" : "s"}.`;
+      await loadSuggestions();
+      render();
+    } else { if (state) state.textContent = (d.error || "Could not send — try again."); }
+  } catch (e) { if (state) state.textContent = "Network error — try again."; }
 }
 
 function noData() {
@@ -304,6 +348,7 @@ document.addEventListener("click", (e) => {
     const a = act.dataset.act;
     if (a === "browse") return setView("browse");
     if (a === "board") return setView("board");
+    if (a === "suggest") return submitSuggestion();
   }
   const addBtn = e.target.closest("[data-add]");
   if (addBtn) {
@@ -329,6 +374,8 @@ document.addEventListener("click", (e) => {
   }
   if (e.target.closest("#theme")) toggleTheme();
 });
+document.addEventListener("input", (e) => { if (e.target && e.target.id === "req-name") REQ_DRAFT = e.target.value; });
+document.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target && e.target.id === "req-name") { e.preventDefault(); submitSuggestion(); } });
 document.getElementById("filter").addEventListener("input", applyFilter);
 
 // Connect a Slack/Discord incoming webhook to the services you're observing.
@@ -617,4 +664,5 @@ async function load() {
 
 render();          // skeleton
 load();            // first fetch
+loadSuggestions().then(() => { if (VIEW === "browse") render(); });
 setInterval(load, 60000);

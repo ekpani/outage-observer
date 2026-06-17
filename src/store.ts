@@ -470,6 +470,38 @@ export async function drainTargetOutbox(env: Env, max: number): Promise<number> 
   return sent;
 }
 
+// ---------- Service suggestions (crowd-sourced catalog requests) ----------
+
+/** Record a "please add this" request and count this voter once. Returns the
+ *  suggestion's current vote total. votes only increments when the voter is new
+ *  (deduped by hashed IP), so the count ≈ distinct people. */
+export async function addSuggestion(env: Env, rawName: string, voter: string): Promise<{ votes: number; name: string }> {
+  const display = rawName.trim().replace(/\s+/g, " ").slice(0, 60);
+  const key = display.toLowerCase();
+  const now = Date.now();
+  await env.DB
+    .prepare("INSERT INTO suggestions (name_key, display_name, votes, created_at, updated_at) VALUES (?, ?, 0, ?, ?) ON CONFLICT(name_key) DO NOTHING")
+    .bind(key, display, now, now)
+    .run();
+  const vote = await env.DB
+    .prepare("INSERT OR IGNORE INTO suggestion_votes (name_key, voter) VALUES (?, ?)")
+    .bind(key, voter)
+    .run();
+  if ((vote.meta?.changes ?? 0) > 0) {
+    await env.DB.prepare("UPDATE suggestions SET votes = votes + 1, updated_at = ? WHERE name_key = ?").bind(now, key).run();
+  }
+  const row = await env.DB.prepare("SELECT votes FROM suggestions WHERE name_key = ?").bind(key).first<{ votes: number }>();
+  return { votes: row?.votes ?? 0, name: display };
+}
+
+export async function getTopSuggestions(env: Env, max = 10): Promise<{ name: string; votes: number }[]> {
+  const { results } = await env.DB
+    .prepare("SELECT display_name AS name, votes FROM suggestions ORDER BY votes DESC, updated_at DESC LIMIT ?")
+    .bind(max)
+    .all<{ name: string; votes: number }>();
+  return results;
+}
+
 // ---------- Meta (D1 key/value) ----------
 //
 // "Last checked" updates every poll, which would blow KV's 1,000 writes/day, so

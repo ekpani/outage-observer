@@ -75,6 +75,24 @@ CREATE TABLE IF NOT EXISTS provider_state (
   updated_at  INTEGER NOT NULL
 );
 
+-- Crowd-sourced "please add this service" requests. We add the popular ones to
+-- the curated catalog by hand (no self-serve arbitrary feeds — keeps curation +
+-- the no-fake-news guarantee). votes ≈ distinct voters (one per hashed IP).
+CREATE TABLE IF NOT EXISTS suggestions (
+  name_key     TEXT    PRIMARY KEY,   -- normalized (lowercased, trimmed)
+  display_name TEXT    NOT NULL,
+  votes        INTEGER NOT NULL DEFAULT 0,
+  created_at   INTEGER NOT NULL,
+  updated_at   INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_suggestions_votes ON suggestions (votes DESC);
+-- One vote per (suggestion, voter); voter = hashed IP, so votes can't be trivially inflated.
+CREATE TABLE IF NOT EXISTS suggestion_votes (
+  name_key TEXT NOT NULL,
+  voter    TEXT NOT NULL,
+  PRIMARY KEY (name_key, voter)
+);
+
 -- ----------------------------------------------------------------------------
 -- Non-Telegram delivery targets (web-push browsers, Slack/Discord webhooks).
 -- A parallel, channel-agnostic substrate so the Telegram path above stays
