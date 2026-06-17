@@ -1,6 +1,6 @@
 import { CATALOG, PRIORITY_IDS, type Provider } from "./catalog";
 import { fetchStatus, SEVERITY, type Level, type ProviderStatus } from "./adapters";
-import { getBoard, setBoard, enqueueNotification, drainOutbox, recordHistory, setCheckedAt, getTargetsForProvider, enqueueTargetEvent, drainTargetOutbox, type Board, type BoardEntry } from "./store";
+import { getBoard, setBoard, setCheckedAt, drainOutbox, drainTargetOutbox, getProviderStates, commitProviderStates, getSubscribersForProviders, getTargetsForProviders, recordHistoryBatch, enqueueNotificationsBatch, enqueueTargetEventsBatch, type BoardEntry } from "./store";
 import { type AlertEvent } from "./channels";
 import { type Env } from "./telegram";
 import { EMOJI, LABEL } from "./labels";
@@ -58,11 +58,15 @@ export async function poll(env: Env, nowMs: number): Promise<number> {
 }
 
 /**
- * SHARED SEAM. Merge a batch of freshly-fetched provider statuses into the
- * persisted board (keeping every other provider's last-known entry), write the
- * board when it changes, and alert subscribers on any transition. Used by both
- * the cron poll (a shard's worth) and the push-webhook ingest path (one
- * provider). Returns the number of transitions.
+ * SHARED SEAM. Used by both the cron poll (a shard's worth) and the push-webhook
+ * ingest path (one provider). Returns the number of confirmed transitions.
+ *
+ * Transition detection runs against the authoritative D1 `provider_state` table
+ * via an atomic compare-and-set, NOT the KV board — so cron and ingest race
+ * safely (whoever flips a provider's row wins; the loser is skipped, so no
+ * double- or lost-alert). The KV board is rebuilt here for /api/status display
+ * only. Fan-out is batched and bounded, so a wide outage with many subscribers
+ * can never exhaust the 50-subrequest budget.
  *
  * Keep this signature stable — the ingest path depends on it.
  */
@@ -70,74 +74,86 @@ export async function applyResults(
   env: Env,
   fetched: Map<string, ProviderStatus>,
 ): Promise<number> {
+  const byId = new Map(CATALOG.map((p) => [p.id, p] as const));
+
+  // 1) Display board (KV): keep every other provider's last-known entry. Purely
+  //    for /api/status rendering now — alerts no longer depend on it.
   const prev = await getBoard(env);
   const prevById = new Map((prev?.providers ?? []).map((e) => [e.id, e] as const));
-
-  const entries: BoardEntry[] = [];
-  const transitions: Transition[] = [];
-
-  for (const provider of CATALOG) {
-    const prevEntry = prevById.get(provider.id);
+  const entries: BoardEntry[] = CATALOG.map((provider) => {
     const status = fetched.get(provider.id);
+    return !status || status.level === "unknown"
+      ? (prevById.get(provider.id) ?? toEntry(provider, { level: "unknown", description: "", incidents: [] }))
+      : toEntry(provider, status);
+  });
 
-    // Not in this batch, or a failed fetch: keep the last known entry.
-    if (!status || status.level === "unknown") {
-      entries.push(prevEntry ?? toEntry(provider, { level: "unknown", description: "", incidents: [] }));
-      continue;
-    }
-
-    entries.push(toEntry(provider, status));
-    if (prevEntry && prevEntry.level !== "unknown" && prevEntry.level !== status.level) {
-      transitions.push({ id: provider.id, name: provider.name, from: prevEntry.level, to: status.level, status });
+  // 2) Transition candidates vs authoritative D1 state. First sighting seeds a
+  //    baseline (no alert); a real level change is a CAS candidate. A failed
+  //    fetch (`unknown`) never touches state → never alert to/from unknown.
+  const states = await getProviderStates(env);
+  const baselines: { id: string; level: Level }[] = [];
+  const candidates: Transition[] = [];
+  for (const [id, status] of fetched) {
+    if (status.level === "unknown") continue;
+    const prevLevel = states.get(id);
+    if (prevLevel === undefined) {
+      baselines.push({ id, level: status.level });
+    } else if (prevLevel !== status.level) {
+      candidates.push({ id, name: byId.get(id)?.name ?? id, from: prevLevel, to: status.level, status });
     }
   }
 
+  // 3) Commit atomically; only CAS winners alert (race-safe against ingest).
+  const confirmedIds = await commitProviderStates(env, candidates, baselines);
+  const confirmed = candidates.filter((c) => confirmedIds.has(c.id));
+
+  // 4) Write the display board (best-effort; not the alert source of truth).
   if (!prev || JSON.stringify(entries) !== JSON.stringify(prev.providers)) {
     await setBoard(env, { updatedAt: new Date().toISOString(), providers: entries });
   }
 
-  // Fan out via the durable outbox. For each transition, look up exactly the
-  // subscribers watching that provider (one indexed D1 query) and enqueue a
-  // message per subscriber. Enqueuing is cheap (DB writes, not subrequests), so
-  // even a wide outage can't blow the budget here.
-  const homeById = new Map(CATALOG.map((p) => [p.id, p.link ?? p.url] as const));
+  // 5) Bounded, batched fan-out of confirmed transitions only.
+  if (confirmed.length) await fanOut(env, confirmed);
+
+  // 6) Drain bounded batches every tick so any backlog flushes over subsequent
+  //    ticks. The fan-out above is now O(1) subrequests, leaving budget here.
+  await drainOutbox(env, 6);
+  await drainTargetOutbox(env, 4);
+
+  return confirmed.length;
+}
+
+/** Fan out a set of confirmed transitions: one IN-query + one batched enqueue
+ *  per channel, so cost is a handful of subrequests no matter the outage size. */
+async function fanOut(env: Env, transitions: Transition[]): Promise<void> {
+  const ids = transitions.map((t) => t.id);
+  await recordHistoryBatch(env, transitions.map((t) => ({ id: t.id, level: t.to })));
+
+  // Telegram subscribers.
+  const subs = await getSubscribersForProviders(env, ids);
+  const notifRows: { chatId: number; text: string }[] = [];
   for (const t of transitions) {
-    await recordHistory(env, t.id, t.to);
-
-    // Telegram subscribers (unchanged path).
-    const { results } = await env.DB
-      .prepare("SELECT chat_id FROM subscriptions WHERE provider_id = ?")
-      .bind(t.id)
-      .all<{ chat_id: number }>();
     const text = formatAlert(t.name, t.from, t.to, t.status);
-    for (const row of results) {
-      await enqueueNotification(env, row.chat_id, text);
-    }
-
-    // Non-Telegram targets (web push, Slack/Discord) via the shared substrate.
-    const targets = await getTargetsForProvider(env, t.id);
-    if (targets.length) {
-      const event: AlertEvent = {
-        id: t.id,
-        name: t.name,
-        level: t.to,
-        from: t.from,
-        url: homeById.get(t.id) ?? "https://outage.observer/",
-        incident: t.status.incidents[0]?.name,
-      };
-      const payload = JSON.stringify(event);
-      for (const target of targets) await enqueueTargetEvent(env, target.id, payload);
-    }
+    for (const chatId of subs.get(t.id) ?? []) notifRows.push({ chatId, text });
   }
+  await enqueueNotificationsBatch(env, notifRows);
 
-  // Drain bounded batches every invocation — including ticks with no transitions
-  // — so any backlog flushes over subsequent cron ticks (runs every minute). The
-  // caps keep external sends within the shared 50-subrequest budget alongside the
-  // ~31 status fetches in this poll.
-  await drainOutbox(env, 8);
-  await drainTargetOutbox(env, 6);
-
-  return transitions.length;
+  // Non-Telegram targets (web push, Slack/Discord).
+  const targetsByProvider = await getTargetsForProviders(env, ids);
+  const homeById = new Map(CATALOG.map((p) => [p.id, p.link ?? p.url] as const));
+  const eventRows: { targetId: number; payload: string }[] = [];
+  for (const t of transitions) {
+    const targets = targetsByProvider.get(t.id);
+    if (!targets?.length) continue;
+    const event: AlertEvent = {
+      id: t.id, name: t.name, level: t.to, from: t.from,
+      url: homeById.get(t.id) ?? "https://outage.observer/",
+      incident: t.status.incidents[0]?.name,
+    };
+    const payload = JSON.stringify(event);
+    for (const target of targets) eventRows.push({ targetId: target.id, payload });
+  }
+  await enqueueTargetEventsBatch(env, eventRows);
 }
 
 export function formatAlert(

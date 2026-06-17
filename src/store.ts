@@ -168,6 +168,109 @@ export async function recordHistory(
     .run();
 }
 
+// ---------- Authoritative alert state (D1, atomic transition detection) ------
+//
+// Transition detection runs against THIS table, not the KV board, so it can be
+// an atomic compare-and-set: cron and push-ingest race safely. Never holds
+// `unknown` (failed fetches leave the row untouched → no alert to/from unknown).
+
+export async function getProviderStates(env: Env): Promise<Map<string, Level>> {
+  const { results } = await env.DB
+    .prepare("SELECT provider_id, level FROM provider_state")
+    .all<{ provider_id: string; level: Level }>();
+  return new Map(results.map((r) => [r.provider_id, r.level]));
+}
+
+/** Advance provider_state atomically in one D1 batch. `baselines` are first-ever
+ *  observations (insert-or-ignore — never an alert). `transitions` are
+ *  compare-and-set: the UPDATE only flips when the stored level is still `from`,
+ *  so a concurrent writer that already moved it matches 0 rows. Returns the ids
+ *  whose CAS won — exactly those should fan out an alert (no dup, no loss). */
+export async function commitProviderStates(
+  env: Env,
+  transitions: { id: string; from: Level; to: Level }[],
+  baselines: { id: string; level: Level }[],
+  at: number = Date.now(),
+): Promise<Set<string>> {
+  const stmts = [
+    ...baselines.map((b) =>
+      env.DB.prepare("INSERT OR IGNORE INTO provider_state (provider_id, level, updated_at) VALUES (?, ?, ?)").bind(b.id, b.level, at),
+    ),
+    ...transitions.map((t) =>
+      env.DB.prepare("UPDATE provider_state SET level = ?, updated_at = ? WHERE provider_id = ? AND level = ?").bind(t.to, at, t.id, t.from),
+    ),
+  ];
+  if (!stmts.length) return new Set();
+  const results = await env.DB.batch(stmts);
+  const confirmed = new Set<string>();
+  transitions.forEach((t, i) => {
+    if ((results[baselines.length + i]?.meta?.changes ?? 0) > 0) confirmed.add(t.id);
+  });
+  return confirmed;
+}
+
+// ---------- Batched fan-out lookups + enqueue (bounded subrequests) ----------
+//
+// One IN-query per kind and one batched INSERT per outbox, so fan-out costs a
+// handful of subrequests regardless of how many providers transitioned or how
+// many subscribers watch them — it can never blow the 50-subrequest budget.
+
+export async function getSubscribersForProviders(env: Env, providerIds: string[]): Promise<Map<string, number[]>> {
+  if (!providerIds.length) return new Map();
+  const ph = providerIds.map(() => "?").join(",");
+  const { results } = await env.DB
+    .prepare(`SELECT provider_id, chat_id FROM subscriptions WHERE provider_id IN (${ph})`)
+    .bind(...providerIds)
+    .all<{ provider_id: string; chat_id: number }>();
+  const map = new Map<string, number[]>();
+  for (const r of results) {
+    const arr = map.get(r.provider_id);
+    if (arr) arr.push(r.chat_id); else map.set(r.provider_id, [r.chat_id]);
+  }
+  return map;
+}
+
+export async function getTargetsForProviders(env: Env, providerIds: string[]): Promise<Map<string, Target[]>> {
+  if (!providerIds.length) return new Map();
+  const ph = providerIds.map(() => "?").join(",");
+  const { results } = await env.DB
+    .prepare(
+      `SELECT s.provider_id, t.id, t.channel, t.address, t.meta
+       FROM target_subs s JOIN targets t ON t.id = s.target_id
+       WHERE s.provider_id IN (${ph})`,
+    )
+    .bind(...providerIds)
+    .all<{ provider_id: string; id: number; channel: string; address: string; meta: string | null }>();
+  const map = new Map<string, Target[]>();
+  for (const r of results) {
+    const target: Target = { id: r.id, channel: r.channel, address: r.address, meta: r.meta };
+    const arr = map.get(r.provider_id);
+    if (arr) arr.push(target); else map.set(r.provider_id, [target]);
+  }
+  return map;
+}
+
+export async function recordHistoryBatch(env: Env, rows: { id: string; level: Level }[], at: number = Date.now()): Promise<void> {
+  if (!rows.length) return;
+  await env.DB.batch(rows.map((r) =>
+    env.DB.prepare("INSERT INTO history (provider_id, level, at) VALUES (?, ?, ?)").bind(r.id, r.level, at),
+  ));
+}
+
+export async function enqueueNotificationsBatch(env: Env, rows: { chatId: number; text: string }[], at: number = Date.now()): Promise<void> {
+  if (!rows.length) return;
+  await env.DB.batch(rows.map((r) =>
+    env.DB.prepare("INSERT INTO outbox (chat_id, text, created_at, sent) VALUES (?, ?, ?, 0)").bind(r.chatId, r.text, at),
+  ));
+}
+
+export async function enqueueTargetEventsBatch(env: Env, rows: { targetId: number; payload: string }[], at: number = Date.now()): Promise<void> {
+  if (!rows.length) return;
+  await env.DB.batch(rows.map((r) =>
+    env.DB.prepare("INSERT INTO target_outbox (target_id, payload, created_at, sent) VALUES (?, ?, ?, 0)").bind(r.targetId, r.payload, at),
+  ));
+}
+
 export interface HistoryEvent {
   id: number;
   provider_id: string;

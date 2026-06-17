@@ -39,6 +39,24 @@ export default {
 
       const board = await getBoard(env);
       const checkedAt = await getCheckedAt(env);
+
+      // Self-heal: if the source has gone stale (cron stalled AND the heartbeat
+      // hasn't caught up), refresh it in the background so any visit re-polls —
+      // long before the 10-min user-facing staleness banner would ever show. The
+      // edge cache (s-maxage=30) already limits this to ~one trigger per 30s; a
+      // 2-min lock guards against a burst of simultaneous cache misses. Safe to
+      // run concurrently with the cron now that transition detection is an atomic
+      // compare-and-set (no double/lost alerts).
+      if (!checkedAt || Date.now() - checkedAt > 90_000) {
+        const lock = new Request("https://oo-internal/self-heal-lock");
+        if (!(await cache.match(lock))) {
+          ctx.waitUntil((async () => {
+            await cache.put(lock, new Response("", { headers: { "cache-control": "max-age=120" } }));
+            try { await poll(env, Date.now()); } catch (e) { console.error("self-heal poll failed", String(e)); }
+          })());
+        }
+      }
+
       const res = new Response(
         JSON.stringify({
           updatedAt: board?.updatedAt ?? null,
@@ -98,12 +116,15 @@ export default {
       }
     }
 
-    // Cap inbound JSON on the public POST routes (their payloads are always tiny)
-    // before parsing — a cheap guard against a multi-MB body OOM-ing the isolate.
+    // Guards for the public subscribe/unsubscribe endpoints: cap the body before
+    // parsing (memory-DoS), then a per-IP rate limit (unbounded D1 growth +
+    // webhook-spam amplification). The Telegram /webhook is secret-gated separately.
     if (request.method === "POST"
-        && (url.pathname.startsWith("/api/push/") || url.pathname.startsWith("/api/webhook/"))
-        && oversized(request)) {
-      return json({ error: "Payload too large." }, 413);
+        && (url.pathname.startsWith("/api/push/") || url.pathname.startsWith("/api/webhook/"))) {
+      if (oversized(request)) return json({ error: "Payload too large." }, 413);
+      const ip = request.headers.get("cf-connecting-ip") ?? "unknown";
+      const { success } = await env.SUBSCRIBE_LIMIT.limit({ key: ip });
+      if (!success) return json({ error: "Too many requests. Try again shortly." }, 429);
     }
 
     // Web Push: hand the browser the VAPID public key it needs to subscribe.

@@ -593,7 +593,10 @@ document.addEventListener("keydown", (e) => {
 
 async function load() {
   try {
-    const res = await fetch("/api/status", { headers: { accept: "application/json" } });
+    // no-store: this is live status. The zone applies a long browser-cache TTL,
+    // which would otherwise make every refresh (and the 60s auto-refresh) re-read
+    // a stale cached copy instead of the edge. Always go to the network.
+    const res = await fetch("/api/status", { headers: { accept: "application/json" }, cache: "no-store" });
     BOARD = await res.json();
   } catch {
     if (!BOARD) BOARD = { updatedAt: null, providers: [] };

@@ -30,5 +30,15 @@
       "database_name": "outage-observer",
       "database_id": "cc4e38af-9824-4eed-96ae-8cca1d97cd5e"
     }
+  ],
+  // Per-IP rate limit for the public subscribe endpoints (push / Slack-Discord
+  // webhook). Free, in-colo. Guards against unbounded D1 growth and webhook
+  // spam. namespace_id is an arbitrary per-account id; the period must be 10|60.
+  "ratelimits": [
+    {
+      "name": "SUBSCRIBE_LIMIT",
+      "namespace_id": "1001",
+      "simple": { "limit": 10, "period": 60 }
+    }
   ]
 }

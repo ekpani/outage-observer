@@ -11,6 +11,14 @@ export interface Env {
   VAPID_PUBLIC: string;
   VAPID_JWK: string;
   VAPID_SUBJECT: string;
+  // Per-IP rate limiter for the public subscribe endpoints (Workers Rate
+  // Limiting binding; see wrangler.jsonc `ratelimits`).
+  SUBSCRIBE_LIMIT: RateLimit;
+}
+
+/** Workers Rate Limiting binding (open beta). `limit({ key })` → { success }. */
+export interface RateLimit {
+  limit(options: { key: string }): Promise<{ success: boolean }>;
 }
 
 export interface InlineButton {

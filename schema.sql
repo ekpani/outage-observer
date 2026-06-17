@@ -60,6 +60,19 @@ CREATE TABLE IF NOT EXISTS meta (
   value TEXT NOT NULL
 );
 
+-- Authoritative per-provider ALERT state, separate from the KV display board.
+-- Transition detection is an atomic compare-and-set on this table, so the cron
+-- poll and the push-ingest path can race without double- or losing-alerting
+-- (whoever flips the row wins; the loser's UPDATE matches 0 rows and is skipped).
+-- It only ever holds real levels — a failed fetch leaves the row untouched — so
+-- we never alert to/from `unknown`. Seeded silently on each provider's first
+-- observation (insert-or-ignore, no alert).
+CREATE TABLE IF NOT EXISTS provider_state (
+  provider_id TEXT    PRIMARY KEY,
+  level       TEXT    NOT NULL,
+  updated_at  INTEGER NOT NULL
+);
+
 -- ----------------------------------------------------------------------------
 -- Non-Telegram delivery targets (web-push browsers, Slack/Discord webhooks).
 -- A parallel, channel-agnostic substrate so the Telegram path above stays
