@@ -9,6 +9,16 @@ import { detectWebhookKind, sendWebhookConfirmation } from "./channels";
 import { CATALOG } from "./catalog";
 import { isGeo } from "./regions";
 
+// The Durable Object that runs the reliable 1-minute poll loop. Must be exported
+// from the Worker entry so wrangler can bind it.
+export { PollerDO } from "./poller-do";
+
+/** Poke the singleton poller DO so it (re)arms its alarm loop. Idempotent. */
+function pokePoller(env: Env): Promise<unknown> {
+  const id = env.POLLER.idFromName("poller");
+  return env.POLLER.get(id).fetch("https://poller.internal/ensure").catch((e) => console.error("poke poller failed", String(e)));
+}
+
 /** Validated coarse-geo list from a subscribe body (empty = all regions). */
 function bodyRegions(body: { regions?: unknown }): string[] {
   return Array.isArray(body?.regions) ? (body.regions as unknown[]).map(String).filter(isGeo) : [];
@@ -25,11 +35,14 @@ function json(body: unknown, status = 200): Response {
 
 export default {
   async scheduled(
-    controller: ScheduledController,
+    _controller: ScheduledController,
     env: Env,
-    _ctx: ExecutionContext,
+    ctx: ExecutionContext,
   ): Promise<void> {
-    await poll(env, controller.scheduledTime);
+    // The DO alarm is the reliable primary poller. Cron is now just a watchdog
+    // that re-arms the DO's alarm if the loop ever died — no direct poll here, so
+    // no double-poll. (The free-tier cron stalls; DO alarms are guaranteed.)
+    ctx.waitUntil(pokePoller(env));
   },
 
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -244,6 +257,7 @@ export default {
       const provided = request.headers.get("x-debug-key") ?? url.searchParams.get("key") ?? "";
       if (await safeEqual(provided, env.DEBUG_KEY)) {
         const n = await poll(env, Date.now());
+        ctx.waitUntil(pokePoller(env));   // also (re)arm the DO loop
         return new Response(`polled one shard, ${n} transition(s)`);
       }
     }

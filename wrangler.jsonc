@@ -40,5 +40,14 @@
       "namespace_id": "1001",
       "simple": { "limit": 10, "period": 60 }
     }
+  ],
+  // Durable Object running the reliable 1-minute poll loop via alarms (the
+  // free-tier cron stalls; DO alarms are guaranteed). SQLite-backed — the only
+  // DO storage available on the free plan.
+  "durable_objects": {
+    "bindings": [{ "name": "POLLER", "class_name": "PollerDO" }]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["PollerDO"] }
   ]
 }

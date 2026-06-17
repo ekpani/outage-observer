@@ -14,6 +14,8 @@ export interface Env {
   // Per-IP rate limiter for the public subscribe endpoints (Workers Rate
   // Limiting binding; see wrangler.jsonc `ratelimits`).
   SUBSCRIBE_LIMIT: RateLimit;
+  // Durable Object that runs the reliable 1-minute poll loop via alarms.
+  POLLER: DurableObjectNamespace;
 }
 
 /** Workers Rate Limiting binding (open beta). `limit({ key })` → { success }. */
