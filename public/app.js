@@ -666,3 +666,31 @@ render();          // skeleton
 load();            // first fetch
 loadSuggestions().then(() => { if (VIEW === "browse") render(); });
 setInterval(load, 60000);
+
+// ---- PWA: register the service worker + a light, dismissible install nudge ----
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+
+(function installAffordance() {
+  const KEY = "oo-install-dismissed";
+  const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  if (standalone || localStorage.getItem(KEY) === "1") return;
+  let deferred = null;
+
+  function bar(inner) {
+    const el = document.createElement("div");
+    el.className = "install-bar";
+    el.innerHTML = inner + '<button class="install-x" aria-label="Dismiss">✕</button>';
+    el.querySelector(".install-x").addEventListener("click", () => { el.remove(); try { localStorage.setItem(KEY, "1"); } catch (e) {} });
+    document.body.appendChild(el);
+    return el;
+  }
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault(); deferred = e;
+    const el = bar('<span>Install Outage Observer for one-tap status and alerts.</span><button class="install-go">Install</button>');
+    el.querySelector(".install-go").addEventListener("click", () => { el.remove(); if (deferred) deferred.prompt(); });
+  });
+  // iOS Safari has no install prompt API, and Web Push needs a Home-Screen install.
+  if (/iphone|ipad|ipod/i.test(navigator.userAgent)) {
+    bar('<span>📲 Add to Home Screen (tap Share, then “Add to Home Screen”) to get outage alerts on iPhone.</span>');
+  }
+})();

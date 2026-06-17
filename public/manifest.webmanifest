@@ -1,0 +1,15 @@
+{
+  "name": "Outage Observer",
+  "short_name": "Observer",
+  "description": "Live status of the services your stack depends on, with alerts the moment they break.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#070809",
+  "theme_color": "#070809",
+  "categories": ["productivity", "developer", "utilities"],
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

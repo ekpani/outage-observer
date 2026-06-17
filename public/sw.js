@@ -1,8 +1,44 @@
-// Outage Observer service worker — receives Web Push events and shows a
-// notification; clicking it focuses an existing tab or opens the status page.
+// Outage Observer service worker: Web Push (incl. iOS 16.4+ installed PWAs, via
+// standard VAPID/aes128gcm) + a small offline shell cache so the installed app
+// launches even with no network (live status still needs the network).
 
-self.addEventListener("install", () => self.skipWaiting());
-self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
+const CACHE = "oo-shell-v1";
+const SHELL = ["/", "/app.js", "/board.css", "/tokens.css", "/favicon.svg", "/icon-192.png"];
+
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    caches.open(CACHE).then((c) => c.addAll(SHELL)).catch(() => {}).then(() => self.skipWaiting()),
+  );
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    caches.keys()
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then(() => self.clients.claim()),
+  );
+});
+
+// Network-first for same-origin GETs: always fresh online, cached shell offline.
+// Never intercept the API/debug paths — those must always hit the network.
+self.addEventListener("fetch", (event) => {
+  const req = event.request;
+  if (req.method !== "GET") return;
+  const url = new URL(req.url);
+  if (url.origin !== self.location.origin) return;
+  if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/debug/")) return;
+  event.respondWith(
+    fetch(req)
+      .then((res) => {
+        if (res.ok && (req.mode === "navigate" || SHELL.includes(url.pathname))) {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
+        }
+        return res;
+      })
+      .catch(() => caches.match(req).then((c) => c || caches.match("/"))),
+  );
+});
 
 self.addEventListener("push", (event) => {
   let data = {};
@@ -10,8 +46,8 @@ self.addEventListener("push", (event) => {
   const title = data.title || "Outage Observer";
   const options = {
     body: data.body || "",
-    icon: "/favicon.svg",
-    badge: "/favicon.svg",
+    icon: "/icon-192.png",
+    badge: "/icon-192.png",
     tag: data.tag || undefined,
     data: { url: data.url || "https://outage.observer/" },
   };
@@ -23,9 +59,10 @@ self.addEventListener("notificationclick", (event) => {
   const url = (event.notification.data && event.notification.data.url) || "https://outage.observer/";
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((wins) => {
-      for (const w of wins) {
-        if (w.url === url && "focus" in w) return w.focus();
-      }
+      // Prefer an exact match; otherwise focus any open window; else open new.
+      const exact = wins.find((w) => w.url === url);
+      if (exact && "focus" in exact) return exact.focus();
+      if (wins.length && "focus" in wins[0]) { wins[0].focus(); return wins[0].navigate ? wins[0].navigate(url) : undefined; }
       return self.clients.openWindow ? self.clients.openWindow(url) : undefined;
     }),
   );

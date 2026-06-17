@@ -80,6 +80,9 @@ function shell(opts: { title: string; description: string; canonical: string; js
 <meta name="theme-color" content="#FBFBFA" media="(prefers-color-scheme: light)" />
 <meta name="theme-color" content="#070809" media="(prefers-color-scheme: dark)" />
 <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<link rel="manifest" href="/manifest.webmanifest" />
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+<meta name="apple-mobile-web-app-title" content="Observer" />
 <link rel="alternate" type="application/atom+xml" title="Outage Observer" href="/feed.xml" />
 <link rel="preload" href="/fonts/DepartureMono-Regular.woff2" as="font" type="font/woff2" crossorigin />
 <link rel="stylesheet" href="/tokens.css" />
