@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Outage Observer — live status of your stack</title>
   <!-- Installable PWA (incl. iOS 16.4+ Home Screen, which then supports Web Push). -->
   <link rel="manifest" href="/manifest.webmanifest" />
@@ -10,7 +10,11 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="Observer" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <!-- `black` (not black-translucent): iOS RESERVES the status bar so content
+       starts below it on every device, with no dependency on env() safe-area
+       insets (which return 0 in standalone PWAs on some iOS versions). A black
+       status bar over the near-black #070809 background stays seamless. -->
+  <meta name="apple-mobile-web-app-status-bar-style" content="black" />
   <meta name="description" content="A fast, no-login status board for the infra and AI providers in your stack. One page, all your services, live." />
   <meta property="og:title" content="Outage Observer" />
   <meta property="og:description" content="Live status of the infra and AI providers in your stack, in one place." />

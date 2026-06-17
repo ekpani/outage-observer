@@ -18,16 +18,7 @@ body {
 a { color: var(--oo-accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
-.sp-wrap {
-  max-width: 760px; margin: 0 auto;
-  /* Safe-area insets so in-PWA navigation isn't clipped by the notch; 0 in
-     normal browsers. Background flows underneath for a seamless look. */
-  padding:
-    calc(var(--oo-space-8) + env(safe-area-inset-top, 0px))
-    calc(var(--oo-space-4) + env(safe-area-inset-right, 0px))
-    calc(var(--oo-space-16) + env(safe-area-inset-bottom, 0px))
-    calc(var(--oo-space-4) + env(safe-area-inset-left, 0px));
-}
+.sp-wrap { max-width: 760px; margin: 0 auto; padding: var(--oo-space-8) var(--oo-space-4) var(--oo-space-16); }
 
 .sp-head { display: flex; align-items: center; gap: var(--oo-space-3); padding-bottom: var(--oo-space-6); border-bottom: 1px solid var(--oo-border); }
 .sp-brand { display: flex; align-items: center; gap: var(--oo-space-2); color: var(--oo-text-primary); }
