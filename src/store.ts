@@ -13,6 +13,9 @@ export interface BoardEntry {
   description: string;
   home: string;
   incident?: { name: string; url?: string };
+  /** Coarse geos the active incident affects (GCP/AWS); absent/empty = global or
+   *  unknown scope. Exposed in /api/status so the Mac app can filter locally. */
+  regions?: string[];
 }
 
 /** The full board, persisted under one KV key and served from /api/status.

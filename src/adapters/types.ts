@@ -27,4 +27,7 @@ export interface ProviderStatus {
   level: Level;
   description: string;
   incidents: Incident[];
+  /** Coarse geos the active incident(s) affect (GCP/AWS expose this; others
+   *  leave it empty → treated as global/unknown for alerting). */
+  regions?: string[];
 }

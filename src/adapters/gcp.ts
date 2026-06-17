@@ -1,4 +1,5 @@
 import { SEVERITY, type Incident, type Level, type ProviderStatus } from "./types";
+import { geosFromLocations } from "../regions";
 
 const SEVERITY_TO_LEVEL: Record<string, Level> = {
   high: "major_outage",
@@ -34,5 +35,10 @@ export async function fetchGcp(url: string): Promise<ProviderStatus> {
     status: "ongoing",
     url: i?.uri ? `https://status.cloud.google.com/${i.uri}` : undefined,
   }));
-  return { level: worst, description: incidents[0]?.name ?? "Service incident", incidents };
+  // Affected regions from GCP's structured locations (incl. a literal "Global").
+  const locations = ongoing.flatMap((i: any) =>
+    (Array.isArray(i?.currently_affected_locations) ? i.currently_affected_locations : [])
+      .map((l: any) => String(l?.title ?? "")).filter(Boolean),
+  );
+  return { level: worst, description: incidents[0]?.name ?? "Service incident", incidents, regions: geosFromLocations(locations) };
 }

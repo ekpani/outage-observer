@@ -2,6 +2,7 @@ import { LABEL, EMOJI } from "./labels";
 import { type Env } from "./telegram";
 import { type Level } from "./adapters";
 import { sendWebPush } from "./webpush";
+import { regionLabel } from "./regions";
 
 // Neutral event payload stored in target_outbox; each channel formats its own.
 export interface AlertEvent {
@@ -11,6 +12,15 @@ export interface AlertEvent {
   from: Level;
   url: string;
   incident?: string;
+  /** Coarse geos affected (GCP/AWS); empty or ["global"] = no region note. */
+  regions?: string[];
+}
+
+/** A " · Europe, Asia-Pacific" scope note, omitted for global/unknown scope. */
+function regionNote(e: AlertEvent): string {
+  const r = e.regions ?? [];
+  if (!r.length || r.includes("global")) return "";
+  return `\nRegions: ${regionLabel(r)}`;
 }
 
 // Status palette (mirrors tokens.css) for Slack attachment colors / Discord embeds.
@@ -43,7 +53,7 @@ function headline(e: AlertEvent): string {
 }
 
 function slackBody(e: AlertEvent): unknown {
-  const detail = `<${e.url}|${e.name}> — ${LABEL[e.level]}` + (e.incident ? `\n${e.incident}` : "");
+  const detail = `<${e.url}|${e.name}> — ${LABEL[e.level]}` + (e.incident ? `\n${e.incident}` : "") + regionNote(e);
   return {
     text: `${EMOJI[e.level]} ${headline(e)}`,
     attachments: [{
@@ -59,7 +69,7 @@ function discordBody(e: AlertEvent): unknown {
     embeds: [{
       title: headline(e),
       url: e.url,
-      description: e.incident || undefined,
+      description: ((e.incident ?? "") + regionNote(e)).trim() || undefined,
       color: parseInt(HEX[e.level].slice(1), 16),
     }],
   };

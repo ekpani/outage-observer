@@ -4,6 +4,7 @@ import { getBoard, setBoard, setCheckedAt, drainOutbox, drainTargetOutbox, getPr
 import { type AlertEvent } from "./channels";
 import { type Env } from "./telegram";
 import { EMOJI, LABEL } from "./labels";
+import { regionLabel } from "./regions";
 
 interface Transition {
   id: string;
@@ -24,6 +25,7 @@ function toEntry(provider: Provider, status: ProviderStatus): BoardEntry {
   };
   const top = status.incidents[0];
   if (top) entry.incident = { name: top.name, url: top.url };
+  if (status.regions?.length) entry.regions = status.regions;
   return entry;
 }
 
@@ -149,6 +151,7 @@ async function fanOut(env: Env, transitions: Transition[]): Promise<void> {
       id: t.id, name: t.name, level: t.to, from: t.from,
       url: homeById.get(t.id) ?? "https://outage.observer/",
       incident: t.status.incidents[0]?.name,
+      regions: t.status.regions ?? [],
     };
     const payload = JSON.stringify(event);
     for (const target of targets) eventRows.push({ targetId: target.id, payload });
@@ -177,6 +180,12 @@ export function formatAlert(
     if (incident.url) lines.push(incident.url);
   } else if (status.description) {
     lines.push(escapeHtml(status.description));
+  }
+
+  // Scope note when the incident is region-specific (not global/unknown).
+  const regions = status.regions ?? [];
+  if (regions.length && !regions.includes("global")) {
+    lines.push(`<i>Regions: ${escapeHtml(regionLabel(regions))}</i>`);
   }
 
   return lines.join("\n");

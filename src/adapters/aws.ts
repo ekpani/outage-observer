@@ -1,4 +1,5 @@
 import { type Incident, type Level, type ProviderStatus } from "./types";
+import { geosFromLocations } from "../regions";
 
 /** AWS Health: GET https://health.aws.amazon.com/public/currentevents
  *  UTF-16 JSON (with a BOM), an array of current per-service events. Event
@@ -69,5 +70,7 @@ export async function fetchAws(url: string): Promise<ProviderStatus> {
     status: "ongoing",
     url: "https://health.aws.amazon.com/health/status",
   }));
-  return { level: worst, description: incidents[0]?.name ?? "Service issue", incidents };
+  // Affected regions from each event's AWS region code (e.g. ap-south-1 → apac).
+  const regions = geosFromLocations(impactful.map((e) => String(e?.region_name ?? "")).filter(Boolean));
+  return { level: worst, description: incidents[0]?.name ?? "Service issue", incidents, regions };
 }

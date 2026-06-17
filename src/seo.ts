@@ -4,6 +4,7 @@ import { getBoard, getCheckedAt, getHistory, type BoardEntry } from "./store";
 import { type Env } from "./telegram";
 import { type Level } from "./adapters";
 import { fetchRecentIncidents } from "./incidents";
+import { regionLabel } from "./regions";
 
 const SITE = "https://outage.observer";
 const BY_ID = new Map(CATALOG.map((p) => [p.id, p] as const));
@@ -135,6 +136,11 @@ export async function renderProviderPage(env: Env, provider: Provider): Promise<
     : "";
   const canonical = `${SITE}/status/${provider.id}`;
 
+  // Affected region(s) for a region-specific incident (GCP/AWS); blank when the
+  // scope is global or unknown.
+  const regions = entry?.regions ?? [];
+  const regionScope = regions.length && !regions.includes("global") ? regionLabel(regions) : "";
+
   const related = CATALOG.filter((p) => p.category === provider.category && p.id !== provider.id).slice(0, 8);
 
   // Prefer the provider's own recent incidents (real history); fall back to the
@@ -166,6 +172,7 @@ export async function renderProviderPage(env: Env, provider: Provider): Promise<
     ${statusPill(level)}
   </div>
   <p class="sp-answer">${asOf}${answerSentence(provider.name, level, incident)}</p>
+  ${regionScope ? `<p class="sp-region">Affected regions: <strong>${esc(regionScope)}</strong></p>` : ""}
   <p class="sp-meta">${esc(provider.category)} · <a href="${esc(official)}" target="_blank" rel="noopener nofollow">Official status page →</a></p>
 
   <section>
