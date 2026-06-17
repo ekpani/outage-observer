@@ -1,6 +1,6 @@
 import { CATALOG, CATEGORY_ORDER, type Provider } from "./catalog";
 import { LABEL } from "./labels";
-import { getBoard, getCheckedAt, getHistory, type BoardEntry } from "./store";
+import { getBoard, getCheckedAt, getHistory, getProviderStats, type BoardEntry } from "./store";
 import { type Env } from "./telegram";
 import { type Level } from "./adapters";
 import { fetchRecentIncidents } from "./incidents";
@@ -118,10 +118,11 @@ function levelOf(board: BoardEntry | undefined): Level {
 
 // ---- /status/<id> : a single provider's "is X down?" page ----
 export async function renderProviderPage(env: Env, provider: Provider): Promise<string> {
-  const [board, checkedAt, history] = await Promise.all([
+  const [board, checkedAt, history, stats] = await Promise.all([
     getBoard(env),
     getCheckedAt(env),
     getHistory(env, [provider.id], 20),
+    getProviderStats(env, provider.id),
   ]);
   const recentIncidents = await fetchRecentIncidents(provider, 5);
   const entry = (board?.providers ?? []).find((e) => e.id === provider.id);
@@ -140,6 +141,19 @@ export async function renderProviderPage(env: Env, provider: Provider): Promise<
   // scope is global or unknown.
   const regions = entry?.regions ?? [];
   const regionScope = regions.length && !regions.includes("global") ? regionLabel(regions) : "";
+
+  // Observed reliability (only when we have recorded history — honest about the
+  // short tracking window; omitted for providers we've never seen change).
+  const reliability = stats.since ? (() => {
+    const days = Math.max(1, Math.round(stats.days));
+    const up = stats.uptimePct != null ? (stats.uptimePct >= 99.95 ? stats.uptimePct.toFixed(2) : stats.uptimePct.toFixed(1)) : null;
+    const last = stats.lastIncidentAt ? esc(stamp(stats.lastIncidentAt)) : null;
+    return `<section>
+    <h2>Reliability</h2>
+    <p class="sp-stats">${up != null ? `<span><strong>${up}%</strong> observed uptime</span>` : ""}<span><strong>${stats.incidents}</strong> incident${stats.incidents === 1 ? "" : "s"} recorded</span>${last ? `<span>last incident ${last}</span>` : ""}</p>
+    <p class="sp-muted">Since Outage Observer began tracking ${esc(provider.name)}, about ${days} day${days === 1 ? "" : "s"} ago. Reflects only what we've observed, not the provider's full history.</p>
+  </section>`;
+  })() : "";
 
   const related = CATALOG.filter((p) => p.category === provider.category && p.id !== provider.id).slice(0, 8);
 
@@ -174,7 +188,7 @@ export async function renderProviderPage(env: Env, provider: Provider): Promise<
   <p class="sp-answer">${asOf}${answerSentence(provider.name, level, incident)}</p>
   ${regionScope ? `<p class="sp-region">Affected regions: <strong>${esc(regionScope)}</strong></p>` : ""}
   <p class="sp-meta">${esc(provider.category)} · <a href="${esc(official)}" target="_blank" rel="noopener nofollow">Official status page →</a></p>
-
+  ${reliability}
   <section>
     <h2>${historyTitle}</h2>
     ${historyRows}

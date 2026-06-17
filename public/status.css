@@ -37,6 +37,8 @@ a:hover { text-decoration: underline; }
 .sp-answer strong { color: var(--oo-text-primary); font-weight: var(--oo-weight-semibold); }
 .sp-region { font-family: var(--oo-font-mono); font-size: var(--oo-text-sm); color: var(--oo-text-secondary); letter-spacing: var(--oo-tracking-mono); margin: 0 0 var(--oo-space-3); }
 .sp-region strong { color: var(--oo-status-degraded, #E5B84B); font-weight: var(--oo-weight-semibold); }
+.sp-stats { display: flex; flex-wrap: wrap; gap: 6px 20px; font-family: var(--oo-font-mono); font-size: var(--oo-text-sm); color: var(--oo-text-secondary); letter-spacing: var(--oo-tracking-mono); margin: 4px 0 4px; }
+.sp-stats strong { color: var(--oo-text-primary); font-weight: var(--oo-weight-semibold); }
 .sp-meta { font-family: var(--oo-font-mono); font-size: var(--oo-text-sm); color: var(--oo-text-muted); letter-spacing: var(--oo-tracking-mono); margin: 0 0 var(--oo-space-8); }
 
 .sp-main h2 { font-size: var(--oo-text-lg); margin: var(--oo-space-8) 0 var(--oo-space-4); padding-top: var(--oo-space-6); border-top: 1px solid var(--oo-border); }

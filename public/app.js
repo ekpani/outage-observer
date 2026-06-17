@@ -120,7 +120,7 @@ function chip(p) {
     + glyph(p.level) + `<span>${esc(p.name)}</span></a>`;
 }
 
-function scopedSummary(tracked, checked) {
+function scopedSummary(tracked, checked, boardWideDown) {
   const time = checked ? hhmm(checked) + " UTC" : "—";
   const bad = tracked.filter(needsAttention).sort((a, b) => SEV[b.level] - SEV[a.level]);
   const known = tracked.filter((p) => p.level !== "unknown");
@@ -140,10 +140,18 @@ function scopedSummary(tracked, checked) {
   const title = bad.length === 1
     ? `${esc(bad[0].name)} is ${PHRASE[bad[0].level]}`
     : `${bad.length} of your services need attention`;
+  // "Is it just me?" — when several of your services break at once it's almost
+  // never your setup; if the whole board is lit up, it's a wide outage.
+  let corr = "";
+  if (bad.length >= 2) {
+    corr = (boardWideDown >= 5)
+      ? '<div class="s-corr">⚡ A wide outage is hitting many providers right now, likely not your setup.</div>'
+      : '<div class="s-corr">Several of your services are down at once, likely a broader incident rather than your setup.</div>';
+  }
   return `<div class="summary loud" style="--summary-fg:var(--oo-status-${worst}-fg)">`
     + `<div class="tile status-${worst}">${glyph(worst, 18)}</div>`
     + `<div class="s-body"><div class="s-title">${title}</div>`
-    + `<div class="s-sub">checked ${time}</div>`
+    + `<div class="s-sub">checked ${time}</div>${corr}`
     + `<div class="affected">${bad.map(chip).join("")}</div></div></div>`;
 }
 
@@ -153,7 +161,7 @@ function boardHtml(providers, stack, checked) {
     .filter((p) => stack.has(p.id))
     .sort((a, b) => SEV[b.level] - SEV[a.level] || a.name.localeCompare(b.name));
 
-  let html = scopedSummary(tracked, checked);
+  let html = scopedSummary(tracked, checked, providers.filter(needsAttention).length);
   html += `<div class="cat mystack"><span class="star">${STAR}</span><span class="label">Observing</span><span class="count mono">${tracked.length}</span><span class="rule"></span></div>`;
   html += tracked.map((p) => rowHtml(p, stack, "board")).join("");
 

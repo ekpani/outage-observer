@@ -269,6 +269,35 @@ export async function recordHistoryBatch(env: Env, rows: { id: string; level: Le
   ));
 }
 
+/** Observed reliability for a provider, reconstructed from recorded transitions.
+ *  Honest by construction: only covers the window since we started tracking, and
+ *  `incidents` counts distinct down-periods (degraded/partial/major). Returns
+ *  since=0 when there's no history yet (so the page can omit the section). */
+export async function getProviderStats(env: Env, providerId: string): Promise<{
+  since: number; days: number; incidents: number; lastIncidentAt: number | null; uptimePct: number | null;
+}> {
+  const { results } = await env.DB
+    .prepare("SELECT level, at FROM history WHERE provider_id = ? ORDER BY at ASC")
+    .bind(providerId)
+    .all<{ level: string; at: number }>();
+  if (!results.length) return { since: 0, days: 0, incidents: 0, lastIncidentAt: null, uptimePct: null };
+  const now = Date.now();
+  const since = results[0].at;
+  const isDown = (l: string) => l === "degraded" || l === "partial_outage" || l === "major_outage";
+  let downMs = 0, incidents = 0, lastIncidentAt: number | null = null, prevDown = false;
+  for (let i = 0; i < results.length; i++) {
+    const cur = results[i];
+    const next = i + 1 < results.length ? results[i + 1]!.at : now;
+    const down = isDown(cur.level);
+    if (down && !prevDown) incidents++;        // start of a distinct down-period
+    if (down) { downMs += Math.max(0, next - cur.at); lastIncidentAt = cur.at; }
+    prevDown = down;
+  }
+  const total = now - since;
+  const uptimePct = total > 0 ? Math.max(0, Math.min(100, 100 * (1 - downMs / total))) : null;
+  return { since, days: total / 86_400_000, incidents, lastIncidentAt, uptimePct };
+}
+
 export async function enqueueNotificationsBatch(env: Env, rows: { chatId: number; text: string }[], at: number = Date.now()): Promise<void> {
   if (!rows.length) return;
   await env.DB.batch(rows.map((r) =>
