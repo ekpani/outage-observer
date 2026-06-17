@@ -33,6 +33,12 @@ final class StatusStore: ObservableObject {
     @Published var observing: Set<String> {
         didSet { UserDefaults.standard.set(Array(observing), forKey: "observing") }
     }
+    /// Coarse geos to notify about (empty = everywhere). Filters notifications
+    /// locally using the regions exposed in /api/status (fail-safe: global/
+    /// unknown-scope incidents always notify).
+    @Published var observingRegions: Set<String> {
+        didSet { UserDefaults.standard.set(Array(observingRegions), forKey: "observingRegions") }
+    }
     @Published var notificationsEnabled: Bool {
         didSet {
             UserDefaults.standard.set(notificationsEnabled, forKey: "notificationsEnabled")
@@ -72,6 +78,7 @@ final class StatusStore: ObservableObject {
         let d = UserDefaults.standard
         onboarded = d.bool(forKey: "didOnboard")
         observing = Set(d.array(forKey: "observing") as? [String] ?? [])
+        observingRegions = Set(d.array(forKey: "observingRegions") as? [String] ?? [])
         notificationsEnabled = (d.object(forKey: "notificationsEnabled") as? Bool) ?? true
         // 30s matches the /api/status edge cache (s-maxage=30) — the freshness
         // floor; polling faster wouldn't return newer data.
@@ -100,7 +107,7 @@ final class StatusStore: ObservableObject {
         if let live = snapshot[id] { return live }
         guard let meta = catalogByID[id] else { return nil }
         return Provider(id: meta.id, name: meta.name, category: meta.category,
-                        level: .unknown, home: nil, incident: nil)
+                        level: .unknown, home: nil, incident: nil, regions: nil)
     }
 
     /// The personalized board: every observed service, worst status first.
@@ -168,6 +175,7 @@ final class StatusStore: ObservableObject {
     /// Wipe everything back to a first-launch state and re-run onboarding.
     func resetAll() {
         observing = []
+        observingRegions = []
         notificationsEnabled = true
         interval = 30
         lastLevels = [:]
@@ -220,7 +228,9 @@ final class StatusStore: ObservableObject {
             // first sample (no prior level) and never to/from unknown.
             for p in snap.providers where observing.contains(p.id) {
                 if let prev = lastLevels[p.id], prev != p.level, prev != .unknown, p.level != .unknown {
-                    if notificationsEnabled {
+                    // Region filter (fail-safe: empty prefs or global/unknown scope
+                    // always notifies).
+                    if notificationsEnabled && shouldNotify(prefs: observingRegions, regions: p.regions) {
                         NotificationManager.shared.notify(provider: p, to: p.level)
                     }
                 }

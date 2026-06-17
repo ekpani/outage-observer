@@ -52,6 +52,13 @@ struct SettingsScreen: View {
                     }
                     .padding(.horizontal, 14).padding(.vertical, 9)
 
+                    group("Regions")
+                    Text("Only notify about these regions, for providers that report one (Google Cloud, AWS). None = everywhere; global incidents always notify.")
+                        .font(.system(size: 11)).foregroundStyle(Theme.textMuted)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 14).padding(.top, 2).padding(.bottom, 4)
+                    ForEach(Geo.allCases) { geo in geoRow(geo) }
+
                     group("Setup")
                     tapRow("Replay onboarding") { store.replayOnboarding() }
                     tapRow("Reset app…", destructive: true) { confirmReset = true }
@@ -122,6 +129,22 @@ struct SettingsScreen: View {
         }
         .toggleStyle(.switch).tint(Theme.accent)
         .padding(.horizontal, 14).padding(.vertical, 8)
+    }
+
+    private func geoRow(_ geo: Geo) -> some View {
+        let on = store.observingRegions.contains(geo.rawValue)
+        return Button {
+            if on { store.observingRegions.remove(geo.rawValue) } else { store.observingRegions.insert(geo.rawValue) }
+        } label: {
+            HStack {
+                Text(geo.label).font(.system(size: 13)).foregroundStyle(Theme.textPrimary)
+                Spacer()
+                Image(systemName: on ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 16)).foregroundStyle(on ? Theme.accent : Theme.textMuted)
+            }
+            .padding(.horizontal, 14).padding(.vertical, 7).contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     private func tapRow(_ label: String, destructive: Bool = false, action: @escaping () -> Void) -> some View {

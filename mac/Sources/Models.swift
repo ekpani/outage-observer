@@ -49,6 +49,36 @@ struct Provider: Codable, Identifiable, Hashable {
     let level: Level
     let home: String?
     let incident: Incident?
+    /// Coarse geos the active incident affects (GCP/AWS); nil/empty = global or
+    /// unknown scope. Optional, so providers without it decode fine.
+    let regions: [String]?
+}
+
+/// Coarse geographies for region-relevant alerting (mirrors the web's regions.ts).
+enum Geo: String, CaseIterable, Identifiable {
+    case na, sa, eu, apac, me, af, oce
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .na: return "North America"
+        case .sa: return "South America"
+        case .eu: return "Europe"
+        case .apac: return "Asia-Pacific"
+        case .me: return "Middle East"
+        case .af: return "Africa"
+        case .oce: return "Oceania"
+        }
+    }
+}
+
+/// Fail-safe: should a user whose chosen geos are `prefs` (empty = everywhere) be
+/// notified about an incident affecting `regions`? Mirrors regions.ts shouldAlert:
+/// empty prefs, or a global/unknown-scope incident, always notifies.
+func shouldNotify(prefs: Set<String>, regions: [String]?) -> Bool {
+    if prefs.isEmpty { return true }
+    let r = regions ?? []
+    if r.isEmpty || r.contains("global") { return true }
+    return r.contains(where: { prefs.contains($0) })
 }
 
 struct Snapshot: Codable {

@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// First-run flow. Three deliberate steps: welcome, choose what to watch
-/// (required — the app only tracks what you pick here), and turn on the bits
-/// that make it set-and-forget. Crafted, unhurried, no settings dumped on you.
+/// First-run flow. Four deliberate steps: welcome, choose what to watch
+/// (required — the app only tracks what you pick here), pick regions (optional),
+/// and turn on the bits that make it set-and-forget. Unhurried, nothing dumped.
 struct OnboardingView: View {
     @EnvironmentObject var store: StatusStore
 
@@ -21,7 +21,8 @@ struct OnboardingView: View {
                     switch step {
                     case 0: WelcomeStep(onContinue: { go(1) })
                     case 1: ChooseStep(onBack: { go(0) }, onContinue: { go(2) })
-                    default: ReadyStep(onBack: { go(1) }, onFinish: finish)
+                    case 2: RegionStep(onBack: { go(1) }, onContinue: { go(3) })
+                    default: ReadyStep(onBack: { go(2) }, onFinish: finish)
                     }
                 }
                 .transition(.asymmetric(
@@ -34,7 +35,7 @@ struct OnboardingView: View {
 
     private var progressDots: some View {
         HStack(spacing: 7) {
-            ForEach(0..<3, id: \.self) { i in
+            ForEach(0..<4, id: \.self) { i in
                 Capsule()
                     .fill(i == step ? Theme.accent : Theme.borderStrong)
                     .frame(width: i == step ? 20 : 6, height: 6)
@@ -230,7 +231,69 @@ private struct FlowChips: View {
     }
 }
 
-// MARK: - Step 3: Ready (notifications + launch at login)
+// MARK: - Step 3: Regions (optional)
+
+private struct RegionStep: View {
+    @EnvironmentObject var store: StatusStore
+    var onBack: () -> Void
+    var onContinue: () -> Void
+
+    private let cols = [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)]
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Spacer(minLength: 12)
+            Image(systemName: "globe.americas").font(.system(size: 42)).foregroundStyle(Theme.accent)
+            Text("Which regions matter?")
+                .font(.system(size: 21, weight: .semibold)).foregroundStyle(Theme.textPrimary).padding(.top, 16)
+            Text("For providers that report a location (Google Cloud, AWS), you'll only be pinged about the regions you pick. Leave them all off to hear about everywhere — global incidents always come through.")
+                .font(.mono(11)).foregroundStyle(Theme.textSecondary)
+                .multilineTextAlignment(.center).padding(.top, 8).padding(.horizontal, 28)
+
+            LazyVGrid(columns: cols, spacing: 10) {
+                ForEach(Geo.allCases) { geo in chip(geo) }
+            }
+            .padding(.top, 22).padding(.horizontal, 28)
+
+            Spacer()
+            HStack(spacing: 12) {
+                Button(action: onBack) {
+                    Image(systemName: "chevron.left").font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.textSecondary).frame(width: 42, height: 42)
+                        .background(RoundedRectangle(cornerRadius: 9).stroke(Theme.border, lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+                PrimaryButton(title: continueTitle, action: onContinue)
+            }
+            .padding(.horizontal, 28).padding(.bottom, 32)
+        }
+    }
+
+    private var continueTitle: String {
+        let n = store.observingRegions.count
+        return n == 0 ? "Everywhere · Continue" : "Continue · \(n) region\(n == 1 ? "" : "s")"
+    }
+
+    private func chip(_ geo: Geo) -> some View {
+        let on = store.observingRegions.contains(geo.rawValue)
+        return Button {
+            if on { store.observingRegions.remove(geo.rawValue) } else { store.observingRegions.insert(geo.rawValue) }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: on ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 15)).foregroundStyle(on ? Theme.accent : Theme.textMuted)
+                Text(geo.label).font(.system(size: 12)).foregroundStyle(Theme.textPrimary)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 12).padding(.vertical, 11)
+            .background(RoundedRectangle(cornerRadius: 11).fill(Theme.bgSurface))
+            .overlay(RoundedRectangle(cornerRadius: 11).stroke(on ? Theme.accent.opacity(0.5) : Theme.border, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Step 4: Ready (notifications + launch at login)
 
 private struct ReadyStep: View {
     @EnvironmentObject var store: StatusStore

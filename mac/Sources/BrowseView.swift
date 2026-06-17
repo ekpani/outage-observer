@@ -80,7 +80,7 @@ struct BrowseView: View {
 
     private func row(_ e: CatalogEntry) -> some View {
         let p = Provider(id: e.id, name: e.name, category: e.category,
-                         level: store.level(for: e.id), home: nil, incident: nil)
+                         level: store.level(for: e.id), home: nil, incident: nil, regions: nil)
         return ProviderRow(provider: p, showToggle: true, observing: store.isObserving(e.id),
                            liveLevel: store.snapshotHas(e.id) ? store.level(for: e.id) : nil,
                            onToggle: { store.toggle(e.id) }, onOpen: { store.open(id: e.id) })
