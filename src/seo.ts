@@ -123,9 +123,10 @@ function levelOf(board: BoardEntry | undefined): Level {
 // Contextual "add our bot" card, shown only on the Slack and Discord provider
 // pages — visitors there demonstrably use that platform. Gated on the bot being
 // configured; Discord shows a coming-soon note until its app id is set.
-function botCta(provider: Provider, env: Env): string {
-  const others = CATALOG.length - 1;
-  if (provider.id === "slack") {
+function botCta(id: string, env: Env): string {
+  // "others" excludes the page's own provider only when it's a tracked one.
+  const others = CATALOG.some((p) => p.id === id) ? CATALOG.length - 1 : CATALOG.length;
+  if (id === "slack") {
     if (!env.SLACK_CLIENT_ID) return "";
     return `<section class="sp-bot">
     <h2>Outage alerts in Slack</h2>
@@ -133,7 +134,7 @@ function botCta(provider: Provider, env: Env): string {
     <p><a class="sp-cta" href="/slack/install">Add to Slack →</a></p>
   </section>`;
   }
-  if (provider.id === "discord") {
+  if (id === "discord") {
     if (!env.DISCORD_APP_ID) {
       return `<section class="sp-bot">
     <h2>Outage alerts in Discord</h2>
@@ -144,6 +145,13 @@ function botCta(provider: Provider, env: Env): string {
     <h2>Outage alerts in Discord</h2>
     <p>Add Outage Observer to your server for alerts on Discord and ${others} other providers, right in your channels with <code>/outage</code>.</p>
     <p><a class="sp-cta" href="/discord/install">Add to Discord →</a></p>
+  </section>`;
+  }
+  if (id === "telegram") {
+    return `<section class="sp-bot">
+    <h2>Outage alerts on Telegram</h2>
+    <p>Outage Observer is a Telegram bot. Start it for alerts on any of the ${others} providers it tracks, right here in Telegram.</p>
+    <p><a class="sp-cta" href="https://t.me/outageobserverbot" target="_blank" rel="noopener noreferrer">Open @outageobserverbot →</a></p>
   </section>`;
   }
   return "";
@@ -238,7 +246,7 @@ export async function renderProviderPage(env: Env, provider: Provider): Promise<
   <p class="sp-answer">${asOf}${answerSentence(provider.name, level, incident)}</p>
   ${regionScope ? `<p class="sp-region">Affected regions: <strong>${esc(regionScope)}</strong></p>` : ""}
   <p class="sp-meta">${esc(provider.category)} · <a href="${esc(official)}" target="_blank" rel="noopener nofollow">Official status page →</a></p>
-  ${botCta(provider, env)}
+  ${botCta(provider.id, env)}
   ${reliability}
   <section>
     <h2>${historyTitle}</h2>
@@ -304,7 +312,7 @@ export async function renderProviderPage(env: Env, provider: Provider): Promise<
 // Answers the same "is X down?" query, but instead of a status it explains there
 // is no machine-readable feed and sends the visitor to the official source. No
 // status pill claim, no SpecialAnnouncement — it can never imply up or down.
-export function renderPointerPage(pointer: Pointer): string {
+export function renderPointerPage(pointer: Pointer, env: Env): string {
   const canonical = `${SITE}/status/${pointer.id}`;
   const related = CATALOG.filter((p) => p.category === pointer.category).slice(0, 8);
 
@@ -349,6 +357,7 @@ export function renderPointerPage(pointer: Pointer): string {
   <p class="sp-answer">Outage Observer can't confirm ${esc(pointer.name)}'s status live. ${esc(pointer.note)}</p>
   <p class="sp-meta">${esc(pointer.category)} · check the official source below for the real-time answer.</p>
   ${officialSection}
+  ${botCta(pointer.id, env)}
   <section>
     <h2>Why isn't ${esc(pointer.name)} tracked live?</h2>
     <p>Outage Observer only reports a status when a provider publishes an official, machine-readable feed it can check every minute. ${esc(pointer.name)} doesn't, so rather than guess — or trust an unattended page that could show green during a real outage — we point you to where ${esc(pointer.name)} actually announces incidents. If ${esc(pointer.name)} ever ships a real status feed, we'll add full tracking and alerts.</p>
@@ -531,7 +540,7 @@ export async function handleSeo(env: Env, url: URL): Promise<Response | null> {
     if (provider) return html(await renderProviderPage(env, provider));
     // Providers we acknowledge but don't poll (no machine-readable feed).
     const pointer = POINTER_BY_ID.get(id);
-    if (pointer) return html(renderPointerPage(pointer));
+    if (pointer) return html(renderPointerPage(pointer, env));
     // Common-name alias (e.g. /status/twitter -> /status/x), else 404.
     const alias = ALIASES[id];
     if (alias && BY_ID.has(alias)) return Response.redirect(`${SITE}/status/${alias}`, 301);

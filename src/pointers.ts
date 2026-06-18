@@ -41,6 +41,14 @@ export const POINTERS: Pointer[] = [
     linkLabel: "Netflix Help Center",
     note: "Netflix has no public status feed; its Help Center runs a live “is Netflix down?” check instead.",
   },
+  {
+    id: "telegram",
+    name: "Telegram",
+    category: "Comms",
+    link: "https://x.com/telegram",
+    linkLabel: "@telegram on X",
+    note: "Telegram publishes no machine-readable status page; its official @telegram channel and X account post major service updates.",
+  },
 ];
 
 export const POINTER_BY_ID = new Map(POINTERS.map((p) => [p.id, p] as const));
