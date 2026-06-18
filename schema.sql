@@ -102,8 +102,8 @@ CREATE TABLE IF NOT EXISTS suggestion_votes (
 
 CREATE TABLE IF NOT EXISTS targets (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
-  channel    TEXT    NOT NULL,            -- 'webpush' | 'slack' | 'discord'
-  address    TEXT    NOT NULL,            -- push endpoint URL, or webhook URL
+  channel    TEXT    NOT NULL,            -- 'webpush' | 'slack' | 'discord' | 'slack-bot' | 'discord-bot'
+  address    TEXT    NOT NULL,            -- push endpoint URL, webhook URL, or channel id (bot channels)
   meta       TEXT,                        -- JSON (web-push keys {p256dh,auth}); else NULL
   token      TEXT    NOT NULL,            -- opaque manage/unsubscribe token
   created_at INTEGER NOT NULL,
@@ -130,3 +130,14 @@ CREATE TABLE IF NOT EXISTS target_outbox (
   sent       INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_target_outbox_sent ON target_outbox (sent, id);
+
+-- Slack bot installs. Bot tokens are per-workspace, so a multi-workspace bot
+-- stores one row per team from the OAuth callback; delivery + slash commands
+-- look up the matching token by team_id (falling back to the SLACK_BOT_TOKEN
+-- secret for the home workspace). chat:write only needs the bot token + channel.
+CREATE TABLE IF NOT EXISTS slack_teams (
+  team_id      TEXT PRIMARY KEY,
+  bot_token    TEXT NOT NULL,
+  team_name    TEXT,
+  installed_at INTEGER NOT NULL
+);

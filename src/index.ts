@@ -7,7 +7,7 @@ import { handleFeed } from "./feed";
 import { handleSeo } from "./seo";
 import { detectWebhookKind, sendWebhookConfirmation } from "./channels";
 import { handleDiscordInteraction } from "./discord";
-import { handleSlackCommand } from "./slack";
+import { handleSlackCommand, handleSlackInstall, handleSlackCallback } from "./slack";
 import { CATALOG, ALIASES } from "./catalog";
 import { POINTER_IDS } from "./pointers";
 import { isGeo } from "./regions";
@@ -242,6 +242,13 @@ export default {
     // Slack slash command (HMAC-verified inside the handler).
     if (url.pathname === "/slack/commands" && request.method === "POST") {
       return handleSlackCommand(env, request);
+    }
+    // Slack multi-workspace OAuth install + callback.
+    if (url.pathname === "/slack/install" && request.method === "GET") {
+      return handleSlackInstall(env);
+    }
+    if (url.pathname === "/slack/oauth/callback" && request.method === "GET") {
+      return handleSlackCallback(env, url);
     }
 
     // Telegram webhook

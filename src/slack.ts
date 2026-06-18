@@ -4,9 +4,11 @@
 // token (stored as a "slack-bot" target keyed on the channel id).
 import { type Env } from "./telegram";
 import { statusText, listText, resolveMany, displayName, HELP } from "./botcommands";
-import { upsertTarget, setTargetSubs, getTargetByChannelAddress, getTargetSubs, deleteTargetByChannelAddress } from "./store";
+import { upsertTarget, setTargetSubs, getTargetByChannelAddress, getTargetSubs, deleteTargetByChannelAddress, setSlackTeam, getSlackToken } from "./store";
 
 const CH = "slack-bot";
+const SITE = "https://outage.observer";
+const SCOPES = "commands,chat:write,chat:write.public";
 
 function timingSafeEqual(a: string, b: string): boolean {
   const ea = new TextEncoder().encode(a);
@@ -54,7 +56,7 @@ export async function handleSlackCommand(env: Env, request: Request): Promise<Re
   if (cmd === "watch") {
     const ids = resolveMany(arg);
     if (!ids.length) return reply("No known services matched. Try ids like `aws openai stripe`.");
-    await joinChannel(env, channelId);    // best-effort; needed to post in public channels
+    await joinChannel(env, channelId, teamId);    // best-effort; needed to post in public channels
     const { id } = await upsertTarget(env, CH, channelId, JSON.stringify({ team: teamId }), null);
     const merged = [...new Set([...await getTargetSubs(env, id), ...ids])];
     await setTargetSubs(env, id, merged);
@@ -65,11 +67,73 @@ export async function handleSlackCommand(env: Env, request: Request): Promise<Re
 
 /** Best-effort join so the bot can post in a public channel; harmless if it's
  *  already a member or the channel is private (the user then /invites it). */
-async function joinChannel(env: Env, channelId: string): Promise<void> {
-  if (!env.SLACK_BOT_TOKEN) return;
+async function joinChannel(env: Env, channelId: string, teamId: string): Promise<void> {
+  const token = await getSlackToken(env, teamId);
+  if (!token) return;
   await fetch("https://slack.com/api/conversations.join", {
     method: "POST",
-    headers: { "content-type": "application/json; charset=utf-8", authorization: `Bearer ${env.SLACK_BOT_TOKEN}` },
+    headers: { "content-type": "application/json; charset=utf-8", authorization: `Bearer ${token}` },
     body: JSON.stringify({ channel: channelId }),
   }).then((r) => r.body?.cancel().catch(() => {})).catch(() => {});
+}
+
+// ---- OAuth install flow (multi-workspace) -----------------------------------
+// "Add to Slack" -> Slack consent -> callback exchanges the code for that
+// workspace's bot token, which we store per team_id. The signing secret is
+// app-wide, so request verification already works for every workspace.
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function page(title: string, msg: string, status = 200): Response {
+  const html = `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escapeHtml(title)} · Outage Observer</title>
+<body style="font:16px/1.5 system-ui,sans-serif;max-width:34rem;margin:18vh auto;padding:0 1.25rem;color:#1a1a1a">
+<h1 style="font-size:1.4rem;margin:0 0 .5rem">${escapeHtml(title)}</h1>
+<p style="color:#555">${escapeHtml(msg)}</p>
+<p><a href="${SITE}/" style="color:#0b7">Open Outage Observer →</a></p>`;
+  return new Response(html, { status, headers: { "content-type": "text/html; charset=utf-8" } });
+}
+
+/** GET /slack/install — kicks off the OAuth consent (with a CSRF state token). */
+export async function handleSlackInstall(env: Env): Promise<Response> {
+  if (!env.SLACK_CLIENT_ID) return page("Not available yet", "The Slack app isn't fully configured. Check back soon.", 503);
+  const state = crypto.randomUUID();
+  await env.STATUS_KV.put(`slack_oauth:${state}`, "1", { expirationTtl: 600 });
+  const auth = new URL("https://slack.com/oauth/v2/authorize");
+  auth.searchParams.set("client_id", env.SLACK_CLIENT_ID);
+  auth.searchParams.set("scope", SCOPES);
+  auth.searchParams.set("redirect_uri", `${SITE}/slack/oauth/callback`);
+  auth.searchParams.set("state", state);
+  return Response.redirect(auth.toString(), 302);
+}
+
+/** GET /slack/oauth/callback — exchange the code for the workspace bot token. */
+export async function handleSlackCallback(env: Env, url: URL): Promise<Response> {
+  if (url.searchParams.get("error")) return page("Install cancelled", "No problem — you can add Outage Observer to Slack any time.", 400);
+  const code = url.searchParams.get("code") ?? "";
+  const state = url.searchParams.get("state") ?? "";
+  if (!code) return page("Couldn't finish", "Missing authorization code. Please try the install link again.", 400);
+  const seen = await env.STATUS_KV.get(`slack_oauth:${state}`);
+  if (!seen) return page("Link expired", "That install link expired. Please start again.", 400);
+  await env.STATUS_KV.delete(`slack_oauth:${state}`);
+  if (!env.SLACK_CLIENT_ID || !env.SLACK_CLIENT_SECRET) return page("Not available yet", "The Slack app isn't fully configured.", 503);
+
+  const res = await fetch("https://slack.com/api/oauth.v2.access", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: env.SLACK_CLIENT_ID,
+      client_secret: env.SLACK_CLIENT_SECRET,
+      code,
+      redirect_uri: `${SITE}/slack/oauth/callback`,
+    }),
+  });
+  const data = await res.json<{ ok?: boolean; access_token?: string; team?: { id?: string; name?: string } }>().catch(() => ({} as any));
+  if (!data?.ok || !data.access_token || !data.team?.id) {
+    return page("Couldn't finish", "Slack didn't complete the install. Please try again.", 400);
+  }
+  await setSlackTeam(env, data.team.id, data.access_token, data.team.name ?? null);
+  return page("Installed", `Outage Observer is now in ${data.team.name ?? "your workspace"}. Use /outage watch <services> in any channel to start.`);
 }

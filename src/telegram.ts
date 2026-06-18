@@ -22,8 +22,11 @@ export interface Env {
   DISCORD_BOT_TOKEN?: string;    // Bot token — creates per-channel webhooks
   DISCORD_APP_ID?: string;       // Application id — for deferred follow-up edits
   // Slack bot (slash command). Set via `wrangler secret put`.
-  SLACK_SIGNING_SECRET?: string; // verifies request signatures (HMAC-SHA256)
-  SLACK_BOT_TOKEN?: string;      // xoxb-… — for chat.postMessage delivery
+  SLACK_SIGNING_SECRET?: string; // verifies request signatures (HMAC-SHA256), app-wide
+  SLACK_BOT_TOKEN?: string;      // xoxb-… — home-workspace fallback token
+  // Slack OAuth (multi-workspace install). From the app's Basic Information.
+  SLACK_CLIENT_ID?: string;
+  SLACK_CLIENT_SECRET?: string;
 }
 
 /** Workers Rate Limiting binding (open beta). `limit({ key })` → { success }. */

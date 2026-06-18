@@ -92,11 +92,11 @@ async function postJson(url: string, body: unknown): Promise<DeliverResult> {
 /** Slack bot delivery via chat.postMessage (the bot posts to a channel id it was
  *  told to watch, using the workspace bot token). Distinct from the "slack"
  *  incoming-webhook path. */
-async function postSlackMessage(env: Env, channelId: string, event: AlertEvent): Promise<DeliverResult> {
-  if (!env.SLACK_BOT_TOKEN) return "retry";
+async function postSlackMessage(token: string, channelId: string, event: AlertEvent): Promise<DeliverResult> {
+  if (!token) return "retry";
   const res = await fetch("https://slack.com/api/chat.postMessage", {
     method: "POST",
-    headers: { "content-type": "application/json; charset=utf-8", authorization: `Bearer ${env.SLACK_BOT_TOKEN}` },
+    headers: { "content-type": "application/json; charset=utf-8", authorization: `Bearer ${token}` },
     body: JSON.stringify({ channel: channelId, ...(slackBody(event) as object) }),
   });
   const data = await res.json<{ ok?: boolean; error?: string }>().catch(() => ({} as { ok?: boolean; error?: string }));
@@ -109,7 +109,7 @@ async function postSlackMessage(env: Env, channelId: string, event: AlertEvent):
 
 export async function deliver(
   env: Env,
-  target: { channel: string; address: string; meta: string | null },
+  target: { channel: string; address: string; meta: string | null; token?: string },
   event: AlertEvent,
 ): Promise<DeliverResult> {
   switch (target.channel) {
@@ -121,7 +121,7 @@ export async function deliver(
       try { webhook = JSON.parse(target.meta ?? "{}").webhook ?? ""; } catch { /* malformed */ }
       return webhook ? postJson(webhook, discordBody(event)) : "gone";
     }
-    case "slack-bot": return postSlackMessage(env, target.address, event);
+    case "slack-bot": return postSlackMessage(target.token ?? env.SLACK_BOT_TOKEN ?? "", target.address, event);
     case "webpush": return sendWebPush(env, target, event);
     default: return "gone";
   }

@@ -427,6 +427,27 @@ export async function getTargetByChannelAddress(
     .first<{ id: number; meta: string | null; regions: string | null }>();
 }
 
+/** Store a Slack workspace's bot token from the OAuth callback (multi-workspace). */
+export async function setSlackTeam(env: Env, teamId: string, botToken: string, teamName: string | null): Promise<void> {
+  await env.DB
+    .prepare(
+      `INSERT INTO slack_teams (team_id, bot_token, team_name, installed_at) VALUES (?, ?, ?, ?)
+       ON CONFLICT(team_id) DO UPDATE SET bot_token = excluded.bot_token, team_name = excluded.team_name, installed_at = excluded.installed_at`,
+    )
+    .bind(teamId, botToken, teamName, Date.now())
+    .run();
+}
+
+/** The bot token for a Slack workspace: the per-team token if installed via
+ *  OAuth, else the SLACK_BOT_TOKEN secret (the home workspace). */
+export async function getSlackToken(env: Env, teamId: string | null): Promise<string> {
+  if (teamId) {
+    const row = await env.DB.prepare("SELECT bot_token FROM slack_teams WHERE team_id = ?").bind(teamId).first<{ bot_token: string }>();
+    if (row?.bot_token) return row.bot_token;
+  }
+  return env.SLACK_BOT_TOKEN ?? "";
+}
+
 /** The provider ids a target currently watches. */
 export async function getTargetSubs(env: Env, targetId: number): Promise<string[]> {
   const { results } = await env.DB
@@ -488,7 +509,15 @@ export async function drainTargetOutbox(env: Env, max: number): Promise<number> 
   for (const row of results) {
     try {
       const event = JSON.parse(row.payload) as AlertEvent;
-      const result = await deliver(env, { channel: row.channel, address: row.address, meta: row.meta }, event);
+      // Slack bot delivery needs the workspace's bot token (per-team). Resolve it
+      // here (store has DB access) so channels.ts stays free of a store import.
+      let token: string | undefined;
+      if (row.channel === "slack-bot") {
+        let team: string | null = null;
+        try { team = JSON.parse(row.meta ?? "{}").team ?? null; } catch { /* malformed meta */ }
+        token = await getSlackToken(env, team);
+      }
+      const result = await deliver(env, { channel: row.channel, address: row.address, meta: row.meta, token }, event);
       if (result === "ok") { done.push(row.id); sent++; }
       else if (result === "gone") { done.push(row.id); goneTargets.add(row.target_id); }
       // "retry": leave queued for a later tick.

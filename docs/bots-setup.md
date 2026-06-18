@@ -75,9 +75,27 @@ Commands (identical on both): `/outage status <service>`, `/outage watch <servic
    npx wrangler secret put SLACK_BOT_TOKEN
    ```
 
+4. **Multi-workspace (so anyone can install it).** Slack bot tokens are
+   per-workspace, so the bot serves other workspaces via OAuth:
+   - *OAuth & Permissions* → **Redirect URLs** → add
+     `https://outage.observer/slack/oauth/callback` → Save.
+   - *Manage Distribution* → tick the checklist → **Activate Public Distribution**.
+   - *Basic Information → App Credentials* → set two more secrets:
+     ```
+     npx wrangler secret put SLACK_CLIENT_ID
+     npx wrangler secret put SLACK_CLIENT_SECRET
+     ```
+   - Share the install link / "Add to Slack" button:
+     **`https://outage.observer/slack/install`**
+
+   Your home workspace already works via the `SLACK_BOT_TOKEN` secret above;
+   every other workspace gets its own token stored at install time. Until
+   `SLACK_CLIENT_ID`/`SECRET` are set, `/slack/install` returns 503 (the bot
+   still works in your home workspace).
+
 (If you'd rather build it "From scratch": add bot scopes `commands`, `chat:write`,
 `chat:write.public`; create a `/outage` slash command with Request URL
-`https://outage.observer/slack/commands`; then install and grab the two secrets.)
+`https://outage.observer/slack/commands`; then install and grab the secrets.)
 
 Public channels work out of the box (`chat:write.public`). For a **private**
 channel, run `/invite @Outage Observer` there once.
@@ -91,16 +109,19 @@ Both bots reuse the existing `targets` → `target_outbox` → drain pipeline:
   chosen providers (same table the website webhook flow uses).
 - Discord: the bot finds-or-creates one incoming webhook per channel
   (`discord-bot` target; delivery posts to that webhook).
-- Slack: delivery is `chat.postMessage` with the workspace bot token
-  (`slack-bot` target keyed on the channel id).
+- Slack: delivery is `chat.postMessage` with the workspace's bot token, resolved
+  per team from `slack_teams` (OAuth installs) and falling back to the
+  `SLACK_BOT_TOKEN` secret for the home workspace (`slack-bot` target keyed on
+  the channel id).
 - Region filtering, the atomic transition detection, and the bounded per-tick
   drain all apply unchanged.
 
-## Distribution / listing (later)
+## Distribution / listing
 
-- **Discord**: works in any server you invite it to. *Verification* is only
-  required to grow past ~100 servers; *App Directory* listing needs that + a
-  light review.
-- **Slack**: works in your workspace immediately. Public distribution needs the
-  OAuth install flow (per-workspace bot tokens — not built yet); the **Slack
-  Marketplace** listing is a full review (scopes, security, privacy, support).
+- **Discord**: works in any server you invite it to (one app-wide bot token).
+  *Verification* is only required to grow past ~100 servers; *App Directory*
+  listing needs that + a light review.
+- **Slack**: public distribution is built — any workspace can install via
+  `https://outage.observer/slack/install` (OAuth stores its per-team bot token).
+  The **Slack Marketplace** listing is the only remaining review (scopes,
+  security, privacy, support), and is optional.
