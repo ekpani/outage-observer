@@ -196,11 +196,28 @@ export const CATALOG: Provider[] = [
   { id: "squarespace", name: "Squarespace", category: "Commerce & CMS", adapter: "statuspage", url: "https://status.squarespace.com" },
   { id: "wix", name: "Wix", category: "Commerce & CMS", adapter: "statuspage", url: "https://status.wix.com" },
   { id: "klarna", name: "Klarna", category: "Finance & crypto", adapter: "statuspage", url: "https://status.klarna.com" },
+
+  // Additional widely-used services (probed live).
+  { id: "cursor", name: "Cursor", category: "AI & model providers", adapter: "statuspage", url: "https://status.cursor.com" },
+  { id: "windsurf", name: "Windsurf", category: "AI & model providers", adapter: "statuspage", url: "https://status.windsurf.com" },
+  { id: "lovable", name: "Lovable", category: "AI & model providers", adapter: "statuspage", url: "https://status.lovable.dev" },
+  { id: "zapier", name: "Zapier", category: "Collaboration", adapter: "statuspage", url: "https://status.zapier.com" },
+  { id: "typeform", name: "Typeform", category: "Collaboration", adapter: "statuspage", url: "https://status.typeform.com" },
+  { id: "rippling", name: "Rippling", category: "Collaboration", adapter: "statuspage", url: "https://status.rippling.com" },
+  { id: "retool", name: "Retool", category: "Dev & CI", adapter: "statuspage", url: "https://status.retool.com" },
+  { id: "ngrok", name: "ngrok", category: "Dev & CI", adapter: "statuspage", url: "https://status.ngrok.com" },
+  { id: "temporal", name: "Temporal", category: "Data & backend", adapter: "statuspage", url: "https://status.temporal.io" },
+  { id: "livekit", name: "LiveKit", category: "Comms", adapter: "statuspage", url: "https://status.livekit.io" },
+  { id: "brevo", name: "Brevo", category: "Comms", adapter: "statuspage", url: "https://status.brevo.com" },
+  { id: "klaviyo", name: "Klaviyo", category: "Commerce & CMS", adapter: "statuspage", url: "https://status.klaviyo.com" },
+  { id: "bigcommerce", name: "BigCommerce", category: "Commerce & CMS", adapter: "statuspage", url: "https://status.bigcommerce.com" },
+  { id: "circle", name: "Circle", category: "Finance & crypto", adapter: "statuspage", url: "https://status.circle.com" },
+  { id: "twingate", name: "Twingate", category: "Cloud & hosting", adapter: "statuspage", url: "https://status.twingate.com" },
 ];
 
 /** INTERNAL polling-freshness set only — NOT a user-facing "essentials" list.
  *  These are polled every minute (~1-min freshness and alert latency); the rest
- *  rotates through ~6-minute shards. Never surfaced in onboarding: we don't
+ *  rotates through shards (a full sweep about every 12-15 minutes). Never surfaced in onboarding: we don't
  *  decide what's essential to anyone. */
 export const PRIORITY_IDS = new Set<string>([
   "aws", "gcp", "azure", "cloudflare", "vercel", "netlify", "github", "npm",

@@ -29,10 +29,15 @@ function toEntry(provider: Provider, status: ProviderStatus): BoardEntry {
   return entry;
 }
 
-// Free tier allows 50 subrequests per invocation. Each tick polls the priority
-// providers (every minute) plus one rotating shard of the rest, keeping the
-// total well under 50 with headroom for KV ops + Telegram sends.
-const REST_SHARD_TARGET = 15;
+// Free tier allows 50 subrequests per invocation (KV/D1/fetch all count). Each
+// tick polls the 16 priority providers (every minute) plus one rotating shard of
+// the rest, so fetches stay bounded as the catalog grows. Worst-case budget for
+// one tick: 16 priority + ~10 shard fetches (26) + board/state/fan-out KV+D1
+// (~10) + drains (drainOutbox 6 -> 8, drainTargetOutbox 4 -> 6) = ~50, and the
+// drains are guarded (see applyResults) so a rare overrun can never discard the
+// already-committed transitions or stall checkedAt — undrained rows just flush
+// next tick. Keep this sum under 50 when changing the shard or drain budgets.
+const REST_SHARD_TARGET = 10;
 
 /** Poll the priority set plus one shard of the remaining catalog. `nowMs`
  *  selects the shard. Returns the number of transitions detected. */
@@ -118,9 +123,16 @@ export async function applyResults(
   if (confirmed.length) await fanOut(env, confirmed);
 
   // 6) Drain bounded batches every tick so any backlog flushes over subsequent
-  //    ticks. The fan-out above is now O(1) subrequests, leaving budget here.
-  await drainOutbox(env, 6);
-  await drainTargetOutbox(env, 4);
+  //    ticks. Guarded: the essential work above (state CAS, board, enqueue) is
+  //    already committed, so if delivery ever hits the subrequest ceiling during
+  //    a heavy incident we swallow it and let the remaining rows flush next tick
+  //    rather than throwing away this tick's confirmed transitions.
+  try {
+    await drainOutbox(env, 6);
+    await drainTargetOutbox(env, 4);
+  } catch (err) {
+    console.warn("drain deferred to next tick", String(err));
+  }
 
   return confirmed.length;
 }

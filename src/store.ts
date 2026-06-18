@@ -462,11 +462,21 @@ export async function drainTargetOutbox(env: Env, max: number): Promise<number> 
     }
   }
 
+  // Collapse the mark-sent UPDATE and every gone-target cleanup into ONE D1
+  // batch (a single subrequest) instead of one round-trip per gone target —
+  // keeps the drain's subrequest cost flat regardless of how many recipients
+  // pruned this tick, which matters under the free-tier 50-subrequest budget.
+  const ops: D1PreparedStatement[] = [];
   if (done.length) {
     const placeholders = done.map(() => "?").join(",");
-    await env.DB.prepare(`UPDATE target_outbox SET sent = 1 WHERE id IN (${placeholders})`).bind(...done).run();
+    ops.push(env.DB.prepare(`UPDATE target_outbox SET sent = 1 WHERE id IN (${placeholders})`).bind(...done));
   }
-  for (const id of goneTargets) await deleteTargetId(env, id);
+  for (const id of goneTargets) {
+    ops.push(env.DB.prepare("DELETE FROM target_subs WHERE target_id = ?").bind(id));
+    ops.push(env.DB.prepare("DELETE FROM target_outbox WHERE target_id = ?").bind(id));
+    ops.push(env.DB.prepare("DELETE FROM targets WHERE id = ?").bind(id));
+  }
+  if (ops.length) await env.DB.batch(ops);
   return sent;
 }
 

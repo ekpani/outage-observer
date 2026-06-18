@@ -78,7 +78,7 @@ function shell(opts: { title: string; description: string; canonical: string; js
 <meta property="og:image:height" content="630" />
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:image" content="${esc(image)}" />
-<meta name="theme-color" content="#FBFBFA" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#ECEBE7" media="(prefers-color-scheme: light)" />
 <meta name="theme-color" content="#070809" media="(prefers-color-scheme: dark)" />
 <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 <link rel="manifest" href="/manifest.webmanifest" />
@@ -270,7 +270,7 @@ export function renderPointerPage(pointer: Pointer): string {
       <button type="button" class="sp-embed-load" id="x-embed-load" aria-label="Load the latest posts from @${esc(pointer.embed.handle)} on X">
         <svg class="sp-embed-x" viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
         <span class="sp-embed-cta">Show latest @${esc(pointer.embed.handle)} posts</span>
-        <span class="sp-embed-note">Loads from x.com — sets X cookies</span>
+        <span class="sp-embed-note">Loads from x.com. May set X cookies.</span>
       </button>
     </div>
     <p class="sp-meta"><a class="sp-cta" href="${esc(pointer.link)}" target="_blank" rel="noopener nofollow">Open ${esc(pointer.linkLabel)} →</a></p>
@@ -281,6 +281,7 @@ export function renderPointerPage(pointer: Pointer): string {
     btn.addEventListener('click', function(){
       var box=document.getElementById('x-embed'); if(!box) return;
       var h=box.getAttribute('data-handle');
+      if(!h||!/^[A-Za-z0-9_]{1,15}$/.test(h)) return; // valid X handle only; never inject arbitrary markup
       var dark=(document.documentElement.getAttribute('data-theme')||'')==='dark'||(!document.documentElement.getAttribute('data-theme')&&matchMedia('(prefers-color-scheme: dark)').matches);
       box.innerHTML='<a class="twitter-timeline" data-theme="'+(dark?'dark':'light')+'" data-chrome="noheader nofooter transparent" data-tweet-limit="5" data-height="560" href="https://twitter.com/'+h+'?ref_src=twsrc%5Etfw">Posts from @'+h+'</a>';
       var s=document.createElement('script');s.src='https://platform.twitter.com/widgets.js';s.async=true;s.charset='utf-8';document.body.appendChild(s);
