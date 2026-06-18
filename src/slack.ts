@@ -5,6 +5,7 @@
 import { type Env } from "./telegram";
 import { statusText, listText, resolveMany, displayName, HELP } from "./botcommands";
 import { upsertTarget, setTargetSubs, getTargetByChannelAddress, getTargetSubs, deleteTargetByChannelAddress, setSlackTeam, getSlackToken } from "./store";
+import { renderNotice } from "./seo";
 
 const CH = "slack-bot";
 const SITE = "https://outage.observer";
@@ -84,18 +85,8 @@ async function joinChannel(env: Env, channelId: string, teamId: string): Promise
 // workspace's bot token, which we store per team_id. The signing secret is
 // app-wide, so request verification already works for every workspace.
 
-function escapeHtml(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
-
-function page(title: string, msg: string, status = 200): Response {
-  const html = `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escapeHtml(title)} · Outage Observer</title>
-<body style="font:16px/1.5 system-ui,sans-serif;max-width:34rem;margin:18vh auto;padding:0 1.25rem;color:#1a1a1a">
-<h1 style="font-size:1.4rem;margin:0 0 .5rem">${escapeHtml(title)}</h1>
-<p style="color:#555">${escapeHtml(msg)}</p>
-<p><a href="${SITE}/" style="color:#0b7">Open Outage Observer →</a></p>`;
-  return new Response(html, { status, headers: { "content-type": "text/html; charset=utf-8" } });
+function page(title: string, msg: string, status = 200, cta?: { href: string; label: string }): Response {
+  return new Response(renderNotice({ title, body: msg, cta }), { status, headers: { "content-type": "text/html; charset=utf-8" } });
 }
 
 /** GET /slack/install — kicks off the OAuth consent (with a CSRF state token). */
@@ -137,5 +128,5 @@ export async function handleSlackCallback(env: Env, url: URL): Promise<Response>
     return page("Couldn't finish", "Slack didn't complete the install. Please try again.", 400);
   }
   await setSlackTeam(env, data.team.id, data.access_token, data.team.name ?? null);
-  return page("Installed", `Outage Observer is now in ${data.team.name ?? "your workspace"}. Use /outage watch <services> in any channel to start.`);
+  return page("Installed", `Outage Observer is now in ${data.team.name ?? "your workspace"}. Use /outage watch <services> in any channel to start.`, 200, { href: SITE + "/", label: "Open the board" });
 }

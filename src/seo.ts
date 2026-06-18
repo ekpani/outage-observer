@@ -120,6 +120,52 @@ function levelOf(board: BoardEntry | undefined): Level {
   return (board?.level as Level) ?? "unknown";
 }
 
+// Contextual "add our bot" card, shown only on the Slack and Discord provider
+// pages — visitors there demonstrably use that platform. Gated on the bot being
+// configured; Discord shows a coming-soon note until its app id is set.
+function botCta(provider: Provider, env: Env): string {
+  const others = CATALOG.length - 1;
+  if (provider.id === "slack") {
+    if (!env.SLACK_CLIENT_ID) return "";
+    return `<section class="sp-bot">
+    <h2>Outage alerts in Slack</h2>
+    <p>Add Outage Observer to your workspace for alerts on Slack and ${others} other providers, right in your channels with <code>/outage</code>.</p>
+    <p><a class="sp-cta" href="/slack/install">Add to Slack →</a></p>
+  </section>`;
+  }
+  if (provider.id === "discord") {
+    if (!env.DISCORD_APP_ID) {
+      return `<section class="sp-bot">
+    <h2>Outage alerts in Discord</h2>
+    <p>An Outage Observer Discord bot is coming soon: alerts on Discord and ${others} other providers, right in your server.</p>
+  </section>`;
+    }
+    return `<section class="sp-bot">
+    <h2>Outage alerts in Discord</h2>
+    <p>Add Outage Observer to your server for alerts on Discord and ${others} other providers, right in your channels with <code>/outage</code>.</p>
+    <p><a class="sp-cta" href="/discord/install">Add to Discord →</a></p>
+  </section>`;
+  }
+  return "";
+}
+
+/** A small branded message page (OAuth callbacks, bot-install gates). Reuses the
+ *  full site shell so these match the rest of Outage Observer, not a bare page. */
+export function renderNotice(opts: { title: string; body: string; cta?: { href: string; label: string } }): string {
+  const cta = opts.cta ? `<p><a class="sp-cta" href="${esc(opts.cta.href)}">${esc(opts.cta.label)} →</a></p>` : "";
+  return shell({
+    title: `${opts.title} · Outage Observer`,
+    description: opts.body,
+    canonical: SITE + "/",
+    jsonld: [],
+    body: `<main class="sp-main sp-notice">
+  <h1>${esc(opts.title)}</h1>
+  <p class="sp-answer">${esc(opts.body)}</p>
+  ${cta}
+</main>`,
+  });
+}
+
 // ---- /status/<id> : a single provider's "is X down?" page ----
 export async function renderProviderPage(env: Env, provider: Provider): Promise<string> {
   const [board, checkedAt, history, stats] = await Promise.all([
@@ -192,6 +238,7 @@ export async function renderProviderPage(env: Env, provider: Provider): Promise<
   <p class="sp-answer">${asOf}${answerSentence(provider.name, level, incident)}</p>
   ${regionScope ? `<p class="sp-region">Affected regions: <strong>${esc(regionScope)}</strong></p>` : ""}
   <p class="sp-meta">${esc(provider.category)} · <a href="${esc(official)}" target="_blank" rel="noopener nofollow">Official status page →</a></p>
+  ${botCta(provider, env)}
   ${reliability}
   <section>
     <h2>${historyTitle}</h2>

@@ -35,6 +35,7 @@ export async function fetchRecentIncidents(provider: Provider, max = 5): Promise
     if (provider.adapter === "statuspage") return await statuspageIncidents(provider, max);
     if (provider.adapter === "gcp") return await gcpIncidents(provider, max);
     if (provider.adapter === "x") return await xIncidents(provider, max);
+    if (provider.adapter === "slack") return await slackIncidents(provider, max);
     return [];
   } catch {
     return [];
@@ -72,6 +73,45 @@ async function xIncidents(provider: Provider, max: number): Promise<IncidentReco
       out.push({ name, level: xLevel(name), at, resolved });
       if (out.length >= max) return out;
     }
+  }
+  return out;
+}
+
+// Slack incident type -> our level (mirrors the slack status adapter).
+const SLACK_LEVEL: Record<string, string> = {
+  outage: "major_outage",
+  incident: "partial_outage",
+  maintenance: "maintenance",
+  notice: "degraded",
+};
+
+/** Slack's status API (slack-status.com): the catalog `url` is the `/current`
+ *  endpoint (active incidents); `/history` holds recent resolved ones. We merge
+ *  active-first so an ongoing incident shows even when it isn't in history yet. */
+async function slackIncidents(provider: Provider, max: number): Promise<IncidentRecord[]> {
+  const historyUrl = provider.url.replace(/\/current(\.json)?$/, "/history");
+  const [current, history] = await Promise.all([
+    fetchFeed(provider.url).catch(() => ({})),
+    fetchFeed(historyUrl).catch(() => []),
+  ]);
+  const active: any[] = Array.isArray(current?.active_incidents) ? current.active_incidents : [];
+  const past: any[] = Array.isArray(history) ? history : [];
+
+  const out: IncidentRecord[] = [];
+  const seen = new Set<number>();
+  for (const i of [...active, ...past]) {
+    const id = Number(i?.id);
+    if (Number.isFinite(id)) { if (seen.has(id)) continue; seen.add(id); }
+    const resolved = String(i?.status ?? "") !== "active";
+    const at = Date.parse(String((resolved ? i?.date_updated : i?.date_created) ?? i?.date_created ?? "")) || Date.now();
+    out.push({
+      name: String(i?.title ?? "Incident"),
+      level: SLACK_LEVEL[String(i?.type ?? "")] ?? "degraded",
+      at,
+      resolved,
+      url: safeUrl(i?.url),
+    });
+    if (out.length >= max) break;
   }
   return out;
 }

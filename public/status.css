@@ -77,6 +77,12 @@ a.inc-name:hover { color: var(--oo-accent); }
 .sp-embed .twitter-timeline { max-width: 100% !important; }
 .sp-embed iframe { border-radius: var(--oo-radius-md) !important; max-width: 100% !important; }
 
+/* "Add the bot" CTA card on the Slack/Discord provider pages */
+.sp-bot { border: 1px solid var(--oo-border); border-radius: var(--oo-radius-lg); padding: 2px var(--oo-space-6) var(--oo-space-6); margin-top: var(--oo-space-8); background: var(--oo-bg-surface); }
+.sp-bot h2 { border-top: none; padding-top: 0; }
+.sp-bot p { color: var(--oo-text-secondary); }
+.sp-bot code { font-family: var(--oo-font-mono); font-size: .9em; color: var(--oo-accent); }
+
 /* Related */
 .sp-related { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: var(--oo-space-2) var(--oo-space-4); }
 .sp-related a { font-family: var(--oo-font-mono); font-size: var(--oo-text-sm); letter-spacing: var(--oo-tracking-mono); }

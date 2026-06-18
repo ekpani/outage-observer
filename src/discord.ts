@@ -6,6 +6,7 @@
 import { type Env } from "./telegram";
 import { statusText, listText, resolveMany, displayName, HELP } from "./botcommands";
 import { upsertTarget, setTargetSubs, getTargetByChannelAddress, getTargetSubs, deleteTargetByChannelAddress } from "./store";
+import { renderNotice } from "./seo";
 
 const API = "https://discord.com/api/v10";
 const EPHEMERAL = 64;                       // message flag: visible only to invoker
@@ -35,6 +36,23 @@ function reply(content: string): Response {
 }
 function say(content: string): Response {
   return json({ type: 4, data: { content } });                     // visible to the whole channel
+}
+
+/** GET /discord/install — invite the bot to a server (bot + slash commands +
+ *  Manage Webhooks). Discord bot invites are a plain authorize link, no callback
+ *  needed since interactions use the HTTP endpoint + app bot token. */
+export function handleDiscordInstall(env: Env): Response {
+  if (!env.DISCORD_APP_ID) {
+    return new Response(
+      renderNotice({ title: "Coming soon", body: "The Outage Observer Discord bot isn't available just yet. Check back shortly." }),
+      { status: 503, headers: { "content-type": "text/html; charset=utf-8" } },
+    );
+  }
+  const invite = new URL("https://discord.com/oauth2/authorize");
+  invite.searchParams.set("client_id", env.DISCORD_APP_ID);
+  invite.searchParams.set("scope", "bot applications.commands");
+  invite.searchParams.set("permissions", "536870912");   // Manage Webhooks
+  return Response.redirect(invite.toString(), 302);
 }
 
 export async function handleDiscordInteraction(env: Env, request: Request, ctx: ExecutionContext): Promise<Response> {

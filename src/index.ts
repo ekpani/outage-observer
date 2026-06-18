@@ -6,7 +6,7 @@ import { handleIngest } from "./ingest";
 import { handleFeed } from "./feed";
 import { handleSeo } from "./seo";
 import { detectWebhookKind, sendWebhookConfirmation } from "./channels";
-import { handleDiscordInteraction } from "./discord";
+import { handleDiscordInteraction, handleDiscordInstall } from "./discord";
 import { handleSlackCommand, handleSlackInstall, handleSlackCallback } from "./slack";
 import { CATALOG, ALIASES } from "./catalog";
 import { POINTER_IDS } from "./pointers";
@@ -238,6 +238,10 @@ export default {
     // Discord slash-command interactions (Ed25519-verified inside the handler).
     if (url.pathname === "/discord/interactions" && request.method === "POST") {
       return handleDiscordInteraction(env, request, ctx);
+    }
+    // Discord bot invite link.
+    if (url.pathname === "/discord/install" && request.method === "GET") {
+      return handleDiscordInstall(env);
     }
     // Slack slash command (HMAC-verified inside the handler).
     if (url.pathname === "/slack/commands" && request.method === "POST") {
