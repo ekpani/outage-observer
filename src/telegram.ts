@@ -16,6 +16,14 @@ export interface Env {
   SUBSCRIBE_LIMIT: RateLimit;
   // Durable Object that runs the reliable 1-minute poll loop via alarms.
   POLLER: DurableObjectNamespace;
+  // Discord bot (HTTP interactions endpoint). All set via `wrangler secret put`;
+  // optional so the Worker runs before the app is configured (routes 503 until set).
+  DISCORD_PUBLIC_KEY?: string;   // hex — verifies Ed25519-signed interactions
+  DISCORD_BOT_TOKEN?: string;    // Bot token — creates per-channel webhooks
+  DISCORD_APP_ID?: string;       // Application id — for deferred follow-up edits
+  // Slack bot (slash command). Set via `wrangler secret put`.
+  SLACK_SIGNING_SECRET?: string; // verifies request signatures (HMAC-SHA256)
+  SLACK_BOT_TOKEN?: string;      // xoxb-… — for chat.postMessage delivery
 }
 
 /** Workers Rate Limiting binding (open beta). `limit({ key })` → { success }. */

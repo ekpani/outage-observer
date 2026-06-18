@@ -89,6 +89,24 @@ async function postJson(url: string, body: unknown): Promise<DeliverResult> {
   return "gone";   // other 4xx (bad/revoked): don't retry forever
 }
 
+/** Slack bot delivery via chat.postMessage (the bot posts to a channel id it was
+ *  told to watch, using the workspace bot token). Distinct from the "slack"
+ *  incoming-webhook path. */
+async function postSlackMessage(env: Env, channelId: string, event: AlertEvent): Promise<DeliverResult> {
+  if (!env.SLACK_BOT_TOKEN) return "retry";
+  const res = await fetch("https://slack.com/api/chat.postMessage", {
+    method: "POST",
+    headers: { "content-type": "application/json; charset=utf-8", authorization: `Bearer ${env.SLACK_BOT_TOKEN}` },
+    body: JSON.stringify({ channel: channelId, ...(slackBody(event) as object) }),
+  });
+  const data = await res.json<{ ok?: boolean; error?: string }>().catch(() => ({} as { ok?: boolean; error?: string }));
+  if (data?.ok) return "ok";
+  // Permanent failures: the channel/workspace is gone or the token is dead.
+  const dead = ["channel_not_found", "is_archived", "account_inactive", "token_revoked", "invalid_auth", "no_permission"];
+  if (dead.includes(String(data?.error))) return "gone";
+  return "retry";   // incl. not_in_channel (user can /invite the bot), rate_limited
+}
+
 export async function deliver(
   env: Env,
   target: { channel: string; address: string; meta: string | null },
@@ -97,6 +115,13 @@ export async function deliver(
   switch (target.channel) {
     case "slack": return postJson(target.address, slackBody(event));
     case "discord": return postJson(target.address, discordBody(event));
+    case "discord-bot": {
+      // Bot-managed channel: the incoming webhook URL lives in meta.
+      let webhook = "";
+      try { webhook = JSON.parse(target.meta ?? "{}").webhook ?? ""; } catch { /* malformed */ }
+      return webhook ? postJson(webhook, discordBody(event)) : "gone";
+    }
+    case "slack-bot": return postSlackMessage(env, target.address, event);
     case "webpush": return sendWebPush(env, target, event);
     default: return "gone";
   }

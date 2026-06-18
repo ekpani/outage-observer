@@ -6,6 +6,8 @@ import { handleIngest } from "./ingest";
 import { handleFeed } from "./feed";
 import { handleSeo } from "./seo";
 import { detectWebhookKind, sendWebhookConfirmation } from "./channels";
+import { handleDiscordInteraction } from "./discord";
+import { handleSlackCommand } from "./slack";
 import { CATALOG, ALIASES } from "./catalog";
 import { POINTER_IDS } from "./pointers";
 import { isGeo } from "./regions";
@@ -231,6 +233,15 @@ export default {
       try { body = await request.json(); } catch { return json({ error: "Bad JSON." }, 400); }
       const ok = await deleteTargetByToken(env, String(body?.token ?? ""));
       return json({ ok });
+    }
+
+    // Discord slash-command interactions (Ed25519-verified inside the handler).
+    if (url.pathname === "/discord/interactions" && request.method === "POST") {
+      return handleDiscordInteraction(env, request, ctx);
+    }
+    // Slack slash command (HMAC-verified inside the handler).
+    if (url.pathname === "/slack/commands" && request.method === "POST") {
+      return handleSlackCommand(env, request);
     }
 
     // Telegram webhook

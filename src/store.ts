@@ -414,6 +414,41 @@ export async function deleteTargetByToken(env: Env, token: string): Promise<bool
   return true;
 }
 
+/** Look up a single target by its natural key (channel+address) without mutating
+ *  it — used by the Slack/Discord bots to find a channel's existing target. */
+export async function getTargetByChannelAddress(
+  env: Env,
+  channel: string,
+  address: string,
+): Promise<{ id: number; meta: string | null; regions: string | null } | null> {
+  return env.DB
+    .prepare("SELECT id, meta, regions FROM targets WHERE channel = ? AND address = ?")
+    .bind(channel, address)
+    .first<{ id: number; meta: string | null; regions: string | null }>();
+}
+
+/** The provider ids a target currently watches. */
+export async function getTargetSubs(env: Env, targetId: number): Promise<string[]> {
+  const { results } = await env.DB
+    .prepare("SELECT provider_id FROM target_subs WHERE target_id = ?")
+    .bind(targetId)
+    .all<{ provider_id: string }>();
+  return results.map((r) => r.provider_id);
+}
+
+/** Delete a target by its natural key (channel+address). Returns true if one was
+ *  removed. The bots' /outage stop uses this to detach a channel. */
+export async function deleteTargetByChannelAddress(
+  env: Env,
+  channel: string,
+  address: string,
+): Promise<boolean> {
+  const t = await env.DB.prepare("SELECT id FROM targets WHERE channel = ? AND address = ?").bind(channel, address).first<{ id: number }>();
+  if (!t) return false;
+  await deleteTargetId(env, t.id);
+  return true;
+}
+
 export async function getTargetsForProvider(env: Env, providerId: string): Promise<Target[]> {
   const { results } = await env.DB
     .prepare(
