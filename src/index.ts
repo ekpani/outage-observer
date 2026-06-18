@@ -6,7 +6,7 @@ import { handleIngest } from "./ingest";
 import { handleFeed } from "./feed";
 import { handleSeo } from "./seo";
 import { detectWebhookKind, sendWebhookConfirmation } from "./channels";
-import { CATALOG } from "./catalog";
+import { CATALOG, ALIASES } from "./catalog";
 import { isGeo } from "./regions";
 
 // The Durable Object that runs the reliable 1-minute poll loop. Must be exported
@@ -284,13 +284,14 @@ export default {
       }
     }
 
-    // Short, shareable provider URLs: /stripe -> /status/stripe (301). Static
-    // assets and all routes above are handled first, so this only catches a
-    // single path segment that is a known provider id.
+    // Short, shareable provider URLs: /stripe -> /status/stripe (301), plus
+    // common-name aliases (/twitter -> /status/x). Static assets and all routes
+    // above are handled first, so this only catches a single known path segment.
     if (request.method === "GET") {
       const seg = url.pathname.slice(1);
-      if (/^[a-z0-9-]+$/.test(seg) && PROVIDER_IDS.has(seg)) {
-        return Response.redirect(new URL(`/status/${seg}`, url.origin).toString(), 301);
+      if (/^[a-z0-9-]+$/.test(seg)) {
+        const target = PROVIDER_IDS.has(seg) ? seg : ALIASES[seg];
+        if (target) return Response.redirect(new URL(`/status/${target}`, url.origin).toString(), 301);
       }
     }
 

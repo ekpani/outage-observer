@@ -1,4 +1,4 @@
-import { CATALOG, CATEGORY_ORDER, type Provider } from "./catalog";
+import { CATALOG, CATEGORY_ORDER, ALIASES, type Provider } from "./catalog";
 import { LABEL } from "./labels";
 import { getBoard, getCheckedAt, getHistory, getProviderStats, type BoardEntry } from "./store";
 import { type Env } from "./telegram";
@@ -372,6 +372,9 @@ export async function handleSeo(env: Env, url: URL): Promise<Response | null> {
     catch { return new Response(notFoundPage(), { status: 404, headers: { "content-type": "text/html; charset=utf-8" } }); }
     const provider = BY_ID.get(id);
     if (!provider) {
+      // Common-name alias (e.g. /status/twitter -> /status/x), else 404.
+      const alias = ALIASES[id];
+      if (alias && BY_ID.has(alias)) return Response.redirect(`${SITE}/status/${alias}`, 301);
       return new Response(notFoundPage(), { status: 404, headers: { "content-type": "text/html; charset=utf-8" } });
     }
     return html(await renderProviderPage(env, provider));

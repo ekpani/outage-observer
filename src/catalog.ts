@@ -205,6 +205,12 @@ export const POPULAR_IDS: string[] = [
 
 /** Display order for the board, the directory, and the bot's onboarding picker.
  *  Ordered by how much people tend to care: cloud + AI lead. */
+/** Short-URL / common-name aliases → canonical provider id. Lets /twitter and
+ *  /status/twitter resolve to the X (Twitter) page (people still search "twitter"). */
+export const ALIASES: Record<string, string> = {
+  twitter: "x",
+};
+
 export const CATEGORY_ORDER: string[] = [
   "Cloud & hosting", "AI & model providers", "Dev & CI", "Data & backend",
   "Payments", "Comms", "CDN & edge", "Auth & identity", "Collaboration",
