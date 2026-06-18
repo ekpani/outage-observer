@@ -40,24 +40,44 @@ Commands (identical on both): `/outage status <service>`, `/outage watch <servic
 
 ## Slack (~10 min)
 
-1. **Create the app** — https://api.slack.com/apps → *Create New App* → *From scratch*.
-2. **OAuth & Permissions → Bot Token Scopes**, add:
-   - `commands` (slash command)
-   - `chat:write` (post alerts)
-   - `chat:write.public` (post to public channels without being invited)
-3. **Slash Commands → Create New Command:**
-   - Command: `/outage`
-   - Request URL: `https://outage.observer/slack/commands`
-   - Short description: `Provider status + outage alerts`
-   - Usage hint: `status <service> | watch <services> | list | stop`
-4. **Install to Workspace** (top of *OAuth & Permissions* / *Install App*).
-5. **Copy two values and set secrets:**
+1. **Create the app** — https://api.slack.com/apps → *Create New App* → **From a
+   manifest** (faster; pre-sets scopes + the slash command). Pick the workspace,
+   then paste this manifest (switch the tab to JSON if it shows YAML):
+   ```json
+   {
+     "display_information": {
+       "name": "Outage Observer",
+       "description": "Provider status and outage alerts for your channels.",
+       "background_color": "#070809"
+     },
+     "features": {
+       "bot_user": { "display_name": "Outage Observer", "always_online": true },
+       "slash_commands": [
+         {
+           "command": "/outage",
+           "url": "https://outage.observer/slack/commands",
+           "description": "Provider status + outage alerts",
+           "usage_hint": "status <service> | watch <services> | list | stop",
+           "should_escape": false
+         }
+       ]
+     },
+     "oauth_config": { "scopes": { "bot": ["commands", "chat:write", "chat:write.public"] } },
+     "settings": { "org_deploy_enabled": false, "socket_mode_enabled": false, "token_rotation_enabled": false }
+   }
+   ```
+2. **Install to Workspace** (button near the top / *Install App*).
+3. **Copy two values and set secrets:**
    - *Basic Information* → **Signing Secret**
    - *OAuth & Permissions* → **Bot User OAuth Token** (`xoxb-…`)
    ```
    npx wrangler secret put SLACK_SIGNING_SECRET
    npx wrangler secret put SLACK_BOT_TOKEN
    ```
+
+(If you'd rather build it "From scratch": add bot scopes `commands`, `chat:write`,
+`chat:write.public`; create a `/outage` slash command with Request URL
+`https://outage.observer/slack/commands`; then install and grab the two secrets.)
 
 Public channels work out of the box (`chat:write.public`). For a **private**
 channel, run `/invite @Outage Observer` there once.
