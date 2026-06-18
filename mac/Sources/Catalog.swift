@@ -107,7 +107,7 @@ let catalog: [CatalogEntry] = [
     CatalogEntry(id: "bugsnag", name: "Bugsnag", category: "Monitoring"),
     CatalogEntry(id: "rollbar", name: "Rollbar", category: "Monitoring"),
     CatalogEntry(id: "launchdarkly", name: "LaunchDarkly", category: "Monitoring"),
-    CatalogEntry(id: "onepassword", name: "1Password", category: "Monitoring"),
+    CatalogEntry(id: "1password", name: "1Password", category: "Monitoring"),
     CatalogEntry(id: "shopify", name: "Shopify", category: "Commerce & CMS"),
     CatalogEntry(id: "contentful", name: "Contentful", category: "Commerce & CMS"),
     CatalogEntry(id: "sanity", name: "Sanity", category: "Commerce & CMS"),

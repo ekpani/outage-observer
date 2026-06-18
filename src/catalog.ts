@@ -144,7 +144,7 @@ export const CATALOG: Provider[] = [
   { id: "bugsnag", name: "Bugsnag", category: "Monitoring", adapter: "statuspage", url: "https://status.bugsnag.com" },
   { id: "rollbar", name: "Rollbar", category: "Monitoring", adapter: "statuspage", url: "https://status.rollbar.com" },
   { id: "launchdarkly", name: "LaunchDarkly", category: "Monitoring", adapter: "statuspage", url: "https://status.launchdarkly.com" },
-  { id: "onepassword", name: "1Password", category: "Monitoring", adapter: "statuspage", url: "https://status.1password.com" },
+  { id: "1password", name: "1Password", category: "Monitoring", adapter: "statuspage", url: "https://status.1password.com" },
 
   // Commerce & CMS
   { id: "shopify", name: "Shopify", category: "Commerce & CMS", adapter: "statuspage", url: "https://www.shopifystatus.com" },
@@ -239,6 +239,7 @@ export const POPULAR_IDS: string[] = [
 export const ALIASES: Record<string, string> = {
   twitter: "x",
   anthropic: "claude",   // renamed; status now lives at status.claude.com
+  onepassword: "1password",
 };
 
 export const CATEGORY_ORDER: string[] = [

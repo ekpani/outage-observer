@@ -23,7 +23,7 @@ const SIZE = 128;
 const SLUGS: Record<string, string> = {
   gcp: "googlecloud", aws: "amazonwebservices", azure: "microsoftazure",
   fly: "flydotio", travis: "travisci", cockroach: "cockroachlabs",
-  onepassword: "1password", monday: "mondaydotcom", getstream: "stream",
+  monday: "mondaydotcom", getstream: "stream",
   wikimedia: "wikipedia", proton: "protonmail", epicgames: "epicgames",
 };
 
