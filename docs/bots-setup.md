@@ -66,36 +66,29 @@ Commands (identical on both): `/outage status <service>`, `/outage watch <servic
      "settings": { "org_deploy_enabled": false, "socket_mode_enabled": false, "token_rotation_enabled": false }
    }
    ```
-2. **Install to Workspace** (button near the top / *Install App*).
-3. **Copy two values and set secrets:**
-   - *Basic Information* → **Signing Secret**
-   - *OAuth & Permissions* → **Bot User OAuth Token** (`xoxb-…`)
+2. **Set the app-wide secrets.** Bot tokens are per-workspace and come from
+   OAuth (below), so the only secrets are the signing secret + OAuth client
+   credentials (all under *Basic Information*):
    ```
-   npx wrangler secret put SLACK_SIGNING_SECRET
-   npx wrangler secret put SLACK_BOT_TOKEN
+   npx wrangler secret put SLACK_SIGNING_SECRET   # Basic Information -> App Credentials
+   npx wrangler secret put SLACK_CLIENT_ID        # Basic Information -> App Credentials
+   npx wrangler secret put SLACK_CLIENT_SECRET    # Basic Information -> App Credentials
    ```
+3. **Add the OAuth redirect URL** — *OAuth & Permissions* → **Redirect URLs** →
+   `https://outage.observer/slack/oauth/callback` → Save.
+4. **Install your own workspace via OAuth** (the same way everyone else does —
+   no static token): visit `https://outage.observer/slack/install` and Allow.
+   The token is stored per-team in `slack_teams`.
+5. **Go public** — *Manage Distribution* → tick the checklist →
+   **Activate Public Distribution**. Then share the install link /
+   "Add to Slack" button: **`https://outage.observer/slack/install`**.
 
-4. **Multi-workspace (so anyone can install it).** Slack bot tokens are
-   per-workspace, so the bot serves other workspaces via OAuth:
-   - *OAuth & Permissions* → **Redirect URLs** → add
-     `https://outage.observer/slack/oauth/callback` → Save.
-   - *Manage Distribution* → tick the checklist → **Activate Public Distribution**.
-   - *Basic Information → App Credentials* → set two more secrets:
-     ```
-     npx wrangler secret put SLACK_CLIENT_ID
-     npx wrangler secret put SLACK_CLIENT_SECRET
-     ```
-   - Share the install link / "Add to Slack" button:
-     **`https://outage.observer/slack/install`**
+There is intentionally **no `SLACK_BOT_TOKEN`** — every workspace, including the
+home one, authorizes via OAuth, so nothing static is hardcoded.
 
-   Your home workspace already works via the `SLACK_BOT_TOKEN` secret above;
-   every other workspace gets its own token stored at install time. Until
-   `SLACK_CLIENT_ID`/`SECRET` are set, `/slack/install` returns 503 (the bot
-   still works in your home workspace).
-
-(If you'd rather build it "From scratch": add bot scopes `commands`, `chat:write`,
+(From scratch instead of the manifest: add bot scopes `commands`, `chat:write`,
 `chat:write.public`; create a `/outage` slash command with Request URL
-`https://outage.observer/slack/commands`; then install and grab the secrets.)
+`https://outage.observer/slack/commands`; then do steps 2-5.)
 
 Public channels work out of the box (`chat:write.public`). For a **private**
 channel, run `/invite @Outage Observer` there once.
@@ -109,10 +102,9 @@ Both bots reuse the existing `targets` → `target_outbox` → drain pipeline:
   chosen providers (same table the website webhook flow uses).
 - Discord: the bot finds-or-creates one incoming webhook per channel
   (`discord-bot` target; delivery posts to that webhook).
-- Slack: delivery is `chat.postMessage` with the workspace's bot token, resolved
-  per team from `slack_teams` (OAuth installs) and falling back to the
-  `SLACK_BOT_TOKEN` secret for the home workspace (`slack-bot` target keyed on
-  the channel id).
+- Slack: delivery is `chat.postMessage` with the workspace's bot token, looked up
+  per team from `slack_teams` (every workspace authorizes via OAuth; no static
+  token) — `slack-bot` target keyed on the channel id.
 - Region filtering, the atomic transition detection, and the bounded per-tick
   drain all apply unchanged.
 

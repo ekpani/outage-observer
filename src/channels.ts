@@ -121,7 +121,7 @@ export async function deliver(
       try { webhook = JSON.parse(target.meta ?? "{}").webhook ?? ""; } catch { /* malformed */ }
       return webhook ? postJson(webhook, discordBody(event)) : "gone";
     }
-    case "slack-bot": return postSlackMessage(target.token ?? env.SLACK_BOT_TOKEN ?? "", target.address, event);
+    case "slack-bot": return postSlackMessage(target.token ?? "", target.address, event);
     case "webpush": return sendWebPush(env, target, event);
     default: return "gone";
   }

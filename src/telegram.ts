@@ -23,8 +23,8 @@ export interface Env {
   DISCORD_APP_ID?: string;       // Application id — for deferred follow-up edits
   // Slack bot (slash command). Set via `wrangler secret put`.
   SLACK_SIGNING_SECRET?: string; // verifies request signatures (HMAC-SHA256), app-wide
-  SLACK_BOT_TOKEN?: string;      // xoxb-… — home-workspace fallback token
   // Slack OAuth (multi-workspace install). From the app's Basic Information.
+  // Per-workspace bot tokens come from the OAuth install (slack_teams), not a secret.
   SLACK_CLIENT_ID?: string;
   SLACK_CLIENT_SECRET?: string;
 }

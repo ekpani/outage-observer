@@ -438,14 +438,13 @@ export async function setSlackTeam(env: Env, teamId: string, botToken: string, t
     .run();
 }
 
-/** The bot token for a Slack workspace: the per-team token if installed via
- *  OAuth, else the SLACK_BOT_TOKEN secret (the home workspace). */
+/** The bot token for a Slack workspace, from its OAuth install. Empty if the
+ *  workspace hasn't installed the app (no static fallback — every workspace,
+ *  including ours, authorizes via OAuth). */
 export async function getSlackToken(env: Env, teamId: string | null): Promise<string> {
-  if (teamId) {
-    const row = await env.DB.prepare("SELECT bot_token FROM slack_teams WHERE team_id = ?").bind(teamId).first<{ bot_token: string }>();
-    if (row?.bot_token) return row.bot_token;
-  }
-  return env.SLACK_BOT_TOKEN ?? "";
+  if (!teamId) return "";
+  const row = await env.DB.prepare("SELECT bot_token FROM slack_teams WHERE team_id = ?").bind(teamId).first<{ bot_token: string }>();
+  return row?.bot_token ?? "";
 }
 
 /** The provider ids a target currently watches. */

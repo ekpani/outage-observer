@@ -133,8 +133,8 @@ CREATE INDEX IF NOT EXISTS idx_target_outbox_sent ON target_outbox (sent, id);
 
 -- Slack bot installs. Bot tokens are per-workspace, so a multi-workspace bot
 -- stores one row per team from the OAuth callback; delivery + slash commands
--- look up the matching token by team_id (falling back to the SLACK_BOT_TOKEN
--- secret for the home workspace). chat:write only needs the bot token + channel.
+-- look up the matching token by team_id. Every workspace (including ours)
+-- authorizes via OAuth, so there is no static fallback token.
 CREATE TABLE IF NOT EXISTS slack_teams (
   team_id      TEXT PRIMARY KEY,
   bot_token    TEXT NOT NULL,
