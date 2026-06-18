@@ -24,7 +24,12 @@ function toEntry(provider: Provider, status: ProviderStatus): BoardEntry {
     home: provider.link ?? provider.url,
   };
   const top = status.incidents[0];
-  if (top) entry.incident = { name: top.name, url: top.url };
+  if (top) {
+    // An open incident on an operational provider is an ongoing note (e.g. a
+    // contained suspension under a green headline), not a current outage.
+    if (status.level === "operational") entry.ongoing = top.name;
+    else entry.incident = { name: top.name, url: top.url };
+  }
   if (status.regions?.length) entry.regions = status.regions;
   return entry;
 }
@@ -119,8 +124,12 @@ export async function applyResults(
     await setBoard(env, { updatedAt: new Date().toISOString(), providers: entries });
   }
 
-  // 5) Bounded, batched fan-out of confirmed transitions only.
-  if (confirmed.length) await fanOut(env, confirmed);
+  // 5) Bounded, batched fan-out — but a return to operational while an incident
+  //    is still OPEN is an ongoing situation, not a recovery (the provider kept
+  //    its headline green during a contained incident). Commit the state above,
+  //    just don't alert "recovered" for it.
+  const alertable = confirmed.filter((c) => !(c.to === "operational" && c.status.incidents.length > 0));
+  if (alertable.length) await fanOut(env, alertable);
 
   // 6) Drain bounded batches every tick so any backlog flushes over subsequent
   //    ticks. Guarded: the essential work above (state CAS, board, enqueue) is

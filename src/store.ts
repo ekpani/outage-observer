@@ -14,6 +14,11 @@ export interface BoardEntry {
   description: string;
   home: string;
   incident?: { name: string; url?: string };
+  /** An OPEN incident on a provider whose overall status is still operational
+   *  (e.g. a contained, intentional suspension). Shown as a low-key "ongoing"
+   *  note, NOT a current outage — kept separate from `incident` so it never reads
+   *  as down or recovered. */
+  ongoing?: string;
   /** Coarse geos the active incident affects (GCP/AWS); absent/empty = global or
    *  unknown scope. Exposed in /api/status so the Mac app can filter locally. */
   regions?: string[];

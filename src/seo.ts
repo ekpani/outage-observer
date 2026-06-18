@@ -186,6 +186,7 @@ export async function renderProviderPage(env: Env, provider: Provider): Promise<
   const entry = (board?.providers ?? []).find((e) => e.id === provider.id);
   const level = levelOf(entry);
   const incident = entry?.incident?.name;
+  const ongoing = entry?.ongoing;   // open incident under an operational headline
   const official = provider.link ?? provider.url;
   // Don't assert a confident live verdict over a frozen feed (same 10-min
   // threshold as the web board). If the poller stalled, the data may be stale.
@@ -243,7 +244,8 @@ export async function renderProviderPage(env: Env, provider: Provider): Promise<
     <h1>Is ${esc(provider.name)} down?</h1>
     ${statusPill(level)}
   </div>
-  <p class="sp-answer">${asOf}${answerSentence(provider.name, level, incident)}</p>
+  <p class="sp-answer">${asOf}${level === "operational" && ongoing ? `<strong>${esc(provider.name)} is operational.</strong> One ongoing incident affecting part of the service.` : answerSentence(provider.name, level, incident)}</p>
+  ${ongoing ? `<p class="sp-region">Ongoing: <strong>${esc(ongoing)}</strong></p>` : ""}
   ${regionScope ? `<p class="sp-region">Affected regions: <strong>${esc(regionScope)}</strong></p>` : ""}
   <p class="sp-meta">${esc(provider.category)} · <a href="${esc(official)}" target="_blank" rel="noopener nofollow">Official status page →</a></p>
   ${botCta(provider.id, env)}
