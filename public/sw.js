@@ -2,7 +2,7 @@
 // standard VAPID/aes128gcm) + a small offline shell cache so the installed app
 // launches even with no network (live status still needs the network).
 
-const CACHE = "oo-shell-v4";
+const CACHE = "oo-shell-v5";
 const SHELL = ["/", "/app.js", "/board.css", "/tokens.css", "/favicon.svg", "/icon-192.png"];
 
 self.addEventListener("install", (event) => {

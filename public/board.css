@@ -190,18 +190,14 @@ body[data-searching="1"] .browse-cta { display: none; }
   padding: 13px 12px 13px 22px; text-decoration: none; color: inherit;
 }
 .row-main:focus-visible { box-shadow: inset 0 0 0 2px var(--oo-focus-ring); outline: none; }
+/* Brand icons sit on a white chip so dark marks (GitHub black, etc.) and
+   transparent silhouettes both read clearly on the dark board. */
 .row .logo {
   position: relative; overflow: hidden;
   width: 28px; height: 28px; border-radius: 7px; flex: none;
-  background: var(--oo-bg-elevated); border: 1px solid var(--oo-border-strong);
-  display: grid; place-items: center;
-  font-family: var(--oo-font-mono); font-size: 12px; color: var(--oo-text-secondary);
+  background: #fff; border: 1px solid var(--oo-border-strong);
 }
-/* Real logo (Simple Icons) overlays the monogram fallback. The img carries the
-   tile's own background so it fully masks the letter (transparent parts of the
-   logo just read as the tile). If it 404s, app.js removes the <img> via onerror
-   and the initial shows through as the fallback. */
-.row .logo img { position: absolute; inset: 0; width: 100%; height: 100%; padding: 5px; object-fit: contain; background: var(--oo-bg-elevated); }
+.row .logo img { position: absolute; inset: 0; width: 100%; height: 100%; padding: 4px; object-fit: contain; }
 .row .name { font-family: var(--oo-font-mono); font-size: 14px; color: var(--oo-text-primary); letter-spacing: var(--oo-tracking-mono); min-width: 140px; flex: none; }
 .row-main:hover .name { color: var(--oo-accent); }
 .row .incident { font-size: 13px; color: var(--oo-text-secondary); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
