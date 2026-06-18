@@ -125,7 +125,7 @@ export default {
     if (request.method === "GET" && (url.pathname === "/.well-known/security.txt" || url.pathname === "/security.txt")) {
       const txt = [
         "Contact: mailto:hi@ekpani.com",
-        "Policy: https://github.com/ekpani/outage-observer/blob/main/SECURITY.md",
+        "Policy: https://outage.observer/security",
         "Expires: 2027-06-18T00:00:00.000Z",
         "Preferred-Languages: en",
         "Canonical: https://outage.observer/.well-known/security.txt",
@@ -136,7 +136,7 @@ export default {
 
     // SEO / AEO surfaces: server-rendered provider pages, the directory,
     // sitemap, and llms.txt. Edge-cached so crawlers don't hit KV/D1 each time.
-    if (request.method === "GET" && (url.pathname === "/status" || url.pathname.startsWith("/status/") || url.pathname === "/sitemap.xml" || url.pathname === "/llms.txt" || ["/privacy", "/terms", "/subprocessors", "/about", "/support", "/mac", "/alerts"].includes(url.pathname))) {
+    if (request.method === "GET" && (url.pathname === "/status" || url.pathname.startsWith("/status/") || url.pathname === "/sitemap.xml" || url.pathname === "/llms.txt" || ["/privacy", "/terms", "/subprocessors", "/security", "/about", "/support", "/mac", "/alerts"].includes(url.pathname))) {
       const cache = caches.default;
       // Key by path only: these pages ignore query params, so caching by full URL
       // lets `?x=1`, `?x=2`, … each spawn a distinct entry — cache dilution that

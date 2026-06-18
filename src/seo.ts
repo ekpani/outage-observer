@@ -476,6 +476,7 @@ export async function renderSitemap(env: Env): Promise<string> {
     { loc: SITE + "/privacy", priority: "0.3", freq: "yearly" },
     { loc: SITE + "/terms", priority: "0.3", freq: "yearly" },
     { loc: SITE + "/subprocessors", priority: "0.2", freq: "yearly" },
+    { loc: SITE + "/security", priority: "0.3", freq: "yearly" },
     ...CATALOG.map((p) => ({ loc: `${SITE}/status/${p.id}`, priority: "0.7", freq: "hourly" })),
     ...POINTERS.map((p) => ({ loc: `${SITE}/status/${p.id}`, priority: "0.4", freq: "weekly" })),
   ];
@@ -561,6 +562,7 @@ export async function handleSeo(env: Env, url: URL): Promise<Response | null> {
   if (path === "/privacy") return html(renderPrivacy());
   if (path === "/terms") return html(renderTerms());
   if (path === "/subprocessors") return html(renderSubprocessors());
+  if (path === "/security") return html(renderSecurity());
   if (path === "/about") return html(renderAbout());
   if (path === "/support") return html(renderSupport());
   if (path === "/mac") return html(renderMac());
@@ -961,6 +963,47 @@ function renderSubprocessors(): string {
         "@type": "WebPage",
         name: "Sub-processors",
         url: SITE + "/subprocessors",
+        isPartOf: { "@type": "WebSite", name: "Outage Observer", url: SITE + "/" },
+      },
+    ],
+    body,
+  });
+}
+
+function renderSecurity(): string {
+  const body = `<nav class="sp-crumbs" aria-label="Breadcrumb"><a href="/">Home</a> / <span>Security</span></nav>
+<main class="sp-main">
+  <h1>Security &amp; vulnerability disclosure</h1>
+  <p class="sp-answer">We take the security of Outage Observer seriously and welcome good-faith reports of potential vulnerabilities.</p>
+  <p class="sp-meta">Last updated 18 June 2026. Machine-readable contact: <a href="/.well-known/security.txt">/.well-known/security.txt</a>.</p>
+  <section>
+    <h2>Reporting a vulnerability</h2>
+    <p>Email <a href="mailto:hi@ekpani.com">hi@ekpani.com</a>, or open a private report via the repository's <a href="${REPO}/security" target="_blank" rel="noopener noreferrer">Security tab</a> ("Report a vulnerability"). Please include steps to reproduce and any relevant logs or proof-of-concept.</p>
+  </section>
+  <section>
+    <h2>What to expect</h2>
+    <p>We aim to acknowledge reports within three business days, keep you informed as we investigate and ship a fix, and credit you once an issue is resolved if you'd like.</p>
+  </section>
+  <section>
+    <h2>Scope</h2>
+    <p>In scope: the Outage Observer Worker and its endpoints (<span class="mono">outage.observer</span>), the Slack, Discord, and Telegram bots, and the source repository. Out of scope: the upstream providers we monitor; our hosting provider (Cloudflare, report to them directly); denial-of-service testing; and social engineering.</p>
+  </section>
+  <section>
+    <h2>Safe harbor</h2>
+    <p>We will not pursue or support legal action against researchers who act in good faith, avoid privacy violations and service disruption, and give us a reasonable chance to remediate before any public disclosure.</p>
+  </section>
+</main>`;
+  return shell({
+    title: "Security · Outage Observer",
+    description: "Outage Observer security and vulnerability disclosure policy: how to report a vulnerability, scope, and safe harbor.",
+    canonical: SITE + "/security",
+    jsonld: [
+      crumbLd([{ name: "Home", path: "/" }, { name: "Security", path: "/security" }]),
+      {
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        name: "Security",
+        url: SITE + "/security",
         isPartOf: { "@type": "WebSite", name: "Outage Observer", url: SITE + "/" },
       },
     ],
