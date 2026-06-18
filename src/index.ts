@@ -83,6 +83,10 @@ export default {
         JSON.stringify({
           updatedAt: board?.updatedAt ?? null,
           checkedAt,
+          // Renamed-provider map { oldId: canonicalId }, e.g. { anthropic: "claude" }.
+          // Clients (the Mac app) migrate any stored observed ids through this so a
+          // rename doesn't leave a stale, unknown row behind.
+          aliases: ALIASES,
           providers: board?.providers ?? [],
         }),
         {

@@ -85,6 +85,10 @@ struct Snapshot: Codable {
     let updatedAt: String?
     let checkedAt: Double?   // ms since epoch, or null
     let providers: [Provider]
+    /// Renamed-provider map { oldId: canonicalId }, e.g. ["anthropic": "claude"].
+    /// Optional so older cached snapshots still decode. Used to migrate stored
+    /// observed ids so a rename never leaves a stale "unknown" row behind.
+    let aliases: [String: String]?
 }
 
 /// Display order for the pickers (mirrors the web).

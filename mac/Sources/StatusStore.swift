@@ -94,6 +94,7 @@ final class StatusStore: ObservableObject {
            let snap = try? JSONDecoder().decode(Snapshot.self, from: data) {
             snapshot = Dictionary(uniqueKeysWithValues: snap.providers.map { ($0.id, $0) })
             if let ms = snap.checkedAt { checkedAt = Date(timeIntervalSince1970: ms / 1000) }
+            if let aliases = snap.aliases { migrateObserved(through: aliases) }
         }
 
         if onboarded { startPolling() }
@@ -155,6 +156,23 @@ final class StatusStore: ObservableObject {
     func snapshotHas(_ id: String) -> Bool { snapshot[id] != nil }
 
     func isObserving(_ id: String) -> Bool { observing.contains(id) }
+
+    /// Migrate stored observed ids through the server's rename map from
+    /// /api/status (e.g. a provider renamed anthropic -> claude), so a rename
+    /// never leaves a stale "unknown" row behind. Idempotent.
+    private func migrateObserved(through aliases: [String: String]) {
+        guard !aliases.isEmpty else { return }
+        var next = observing
+        var changed = false
+        for id in observing {
+            if let canonical = aliases[id] {
+                next.remove(id)
+                next.insert(canonical)
+                changed = true
+            }
+        }
+        if changed { observing = next }   // didSet persists to UserDefaults
+    }
 
     // MARK: Live catalog (from /api/status, so newly-added services appear
     // WITHOUT a Mac update; the bundled catalog is the offline / first-launch
@@ -254,6 +272,7 @@ final class StatusStore: ObservableObject {
             req.cachePolicy = .reloadIgnoringLocalCacheData
             let (data, _) = try await URLSession.shared.data(for: req)
             let snap = try JSONDecoder().decode(Snapshot.self, from: data)
+            if let aliases = snap.aliases { migrateObserved(through: aliases) }
 
             // Notify on real transitions for observed services — outages,
             // degradations, maintenance, and recoveries alike. Never on the
