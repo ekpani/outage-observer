@@ -1,4 +1,4 @@
-export type Adapter = "statuspage" | "instatus" | "slack" | "heroku" | "gcp" | "aws" | "azure";
+export type Adapter = "statuspage" | "instatus" | "slack" | "heroku" | "gcp" | "aws" | "azure" | "x";
 
 export interface Provider {
   id: string;
@@ -161,6 +161,7 @@ export const CATALOG: Provider[] = [
 
   // Social & community
   { id: "reddit", name: "Reddit", category: "Social & community", adapter: "statuspage", url: "https://www.redditstatus.com" },
+  { id: "x", name: "X (Twitter)", category: "Social & community", adapter: "x", url: "https://docs.x.com/status.md", link: "https://docs.x.com/status" },
   { id: "pinterest", name: "Pinterest", category: "Social & community", adapter: "statuspage", url: "https://status.pinterest.com" },
   { id: "medium", name: "Medium", category: "Social & community", adapter: "statuspage", url: "https://medium.statuspage.io" },
   { id: "wikimedia", name: "Wikimedia", category: "Social & community", adapter: "statuspage", url: "https://www.wikimediastatus.net" },

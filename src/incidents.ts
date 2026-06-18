@@ -34,10 +34,46 @@ export async function fetchRecentIncidents(provider: Provider, max = 5): Promise
   try {
     if (provider.adapter === "statuspage") return await statuspageIncidents(provider, max);
     if (provider.adapter === "gcp") return await gcpIncidents(provider, max);
+    if (provider.adapter === "x") return await xIncidents(provider, max);
     return [];
   } catch {
     return [];
   }
+}
+
+/** Level for an X incident, inferred from its title (no structured impact). */
+function xLevel(title: string): string {
+  const t = title.toLowerCase();
+  if (/major|site-wide/.test(t)) return "major_outage";
+  if (/outage|503|down/.test(t)) return "partial_outage";
+  return "degraded";
+}
+
+async function xIncidents(provider: Provider, max: number): Promise<IncidentRecord[]> {
+  const res = await fetch(provider.url, {
+    headers: { "user-agent": "OutageObserver/0.1 (+https://outage.observer)" },
+    cf: { cacheTtl: 3600, cacheEverything: true },
+    signal: AbortSignal.timeout(8000),
+  });
+  if (!res.ok) return [];
+  const md = await res.text();
+  const out: IncidentRecord[] = [];
+  // Walk "### Month YYYY" sections (the year lives in the header, the day in the
+  // step body) and parse each <Step>.
+  for (const sec of md.matchAll(/###\s+([A-Za-z]+)\s+(\d{4})([\s\S]*?)(?=###\s+[A-Za-z]+\s+\d{4}|$)/g)) {
+    const year = sec[2];
+    for (const st of sec[3].matchAll(/<Step\s+title="([^"]+)"[^>]*>([\s\S]*?)<\/Step>/gi)) {
+      const name = st[1].trim();
+      const body = st[2];
+      const resolved = /resolved/i.test(body) && !/ongoing|current/i.test(body);
+      const dm = /\*\*([A-Za-z]+\s+\d{1,2}),?\s+([\d:]+)\s*UTC/.exec(body);
+      let at = Date.now();
+      if (dm) { const p = Date.parse(`${dm[1]} ${year} ${dm[2]} UTC`); if (!Number.isNaN(p)) at = p; }
+      out.push({ name, level: xLevel(name), at, resolved });
+      if (out.length >= max) return out;
+    }
+  }
+  return out;
 }
 
 async function fetchFeed(url: string): Promise<any> {

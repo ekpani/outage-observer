@@ -7,6 +7,7 @@ import { fetchHeroku } from "./heroku";
 import { fetchGcp } from "./gcp";
 import { fetchAws } from "./aws";
 import { fetchAzure } from "./azure";
+import { fetchX } from "./x";
 
 export type { Level, Incident, ProviderStatus } from "./types";
 export { SEVERITY } from "./types";
@@ -28,5 +29,7 @@ export function fetchStatus(provider: Provider): Promise<ProviderStatus> {
       return fetchAws(provider.url);
     case "azure":
       return fetchAzure(provider.url);
+    case "x":
+      return fetchX(provider.url);
   }
 }
