@@ -1,6 +1,6 @@
 import { CATALOG, CATEGORY_ORDER, ALIASES, type Provider } from "./catalog";
 import { POINTERS, POINTER_BY_ID, type Pointer } from "./pointers";
-import { COMPETITORS, COMPARE_BY_SLUG, OO_EDGE, type Competitor } from "./compare";
+import { COMPETITORS, COMPARE_BY_SLUG, COMPARE_GROUPS, OO_EDGE, type Competitor } from "./compare";
 import { LABEL } from "./labels";
 import { getBoard, getCheckedAt, getHistory, getProviderStats, type BoardEntry } from "./store";
 import { type Env } from "./telegram";
@@ -413,7 +413,7 @@ export async function renderDirectory(env: Env): Promise<string> {
   for (const cat of CATEGORY_ORDER) {
     const inCat = CATALOG.filter((p) => p.category === cat);
     if (!inCat.length) continue;
-    sections += `<section class="sp-cat"><h2>${esc(cat)}</h2><ul class="sp-dir">`;
+    sections += `<section class="sp-cat"><h2><a href="/status/category/${catSlug(cat)}">${esc(cat)}</a></h2><ul class="sp-dir">`;
     for (const p of inCat) {
       const level = levelOf(byId.get(p.id));
       sections += `<li><a href="/status/${p.id}"><span class="sp-dir-name">${esc(p.name)}</span>${statusPill(level)}</a></li>`;
@@ -482,6 +482,7 @@ export async function renderSitemap(env: Env): Promise<string> {
     { loc: SITE + "/security", priority: "0.3", freq: "yearly" },
     { loc: SITE + "/compare", priority: "0.6", freq: "monthly" },
     ...COMPETITORS.map((c) => ({ loc: `${SITE}/compare/${c.slug}`, priority: "0.6", freq: "monthly" })),
+    ...CATEGORY_ORDER.filter((c) => CATALOG.some((p) => p.category === c)).map((c) => ({ loc: `${SITE}/status/category/${catSlug(c)}`, priority: "0.6", freq: "daily" })),
     ...CATALOG.map((p) => ({ loc: `${SITE}/status/${p.id}`, priority: "0.7", freq: "hourly" })),
     ...POINTERS.map((p) => ({ loc: `${SITE}/status/${p.id}`, priority: "0.4", freq: "weekly" })),
   ];
@@ -519,6 +520,18 @@ export async function renderLlms(env: Env): Promise<string> {
     }
   }
   lines.push("");
+  lines.push("## Status by category");
+  for (const cat of CATEGORY_ORDER) {
+    if (!CATALOG.some((p) => p.category === cat)) continue;
+    lines.push(`- [${cat} status](${SITE}/status/category/${catSlug(cat)}): live status of the ${cat.toLowerCase()} providers we track`);
+  }
+  lines.push("");
+  lines.push("## How Outage Observer compares");
+  lines.push(`- [Compare](${SITE}/compare): honest comparisons with the closest tools. Outage Observer is free, needs no account, reads only official status feeds (no synthetic checks or crowd reports, so no false alarms), and alerts on web, Telegram, Slack, Discord, push, RSS, a native Mac app, and an installable web app.`);
+  for (const c of COMPETITORS) {
+    lines.push(`- [Outage Observer vs ${c.name}](${SITE}/compare/${c.slug}): ${c.name} is ${c.what}.`);
+  }
+  lines.push("");
   lines.push("## Directory & feeds");
   lines.push(`- [Service status directory](${SITE}/status): live status of all ${CATALOG.length} providers`);
   lines.push(`- [Atom feed](${SITE}/feed.xml): every recent status change`);
@@ -539,6 +552,14 @@ export async function handleSeo(env: Env, url: URL): Promise<Response | null> {
 
   if (path === "/status" || path === "/status/") {
     return html(await renderDirectory(env));
+  }
+  if (path.startsWith("/status/category/")) {
+    let slug: string;
+    try { slug = decodeURIComponent(path.slice("/status/category/".length).replace(/\/$/, "")); }
+    catch { return new Response(notFoundPage(), { status: 404, headers: { "content-type": "text/html; charset=utf-8" } }); }
+    const cat = CATEGORY_BY_SLUG.get(slug);
+    if (cat) return html(await renderCategoryPage(env, cat));
+    return new Response(notFoundPage(), { status: 404, headers: { "content-type": "text/html; charset=utf-8" } });
   }
   if (path.startsWith("/status/")) {
     let id: string;
@@ -1032,6 +1053,15 @@ function renderSecurity(): string {
 
 // ---- /compare : how Outage Observer stacks up (honest, by approach) ----
 function renderCompareHub(): string {
+  const groups = COMPARE_GROUPS.map((g) => {
+    const items = COMPETITORS.filter((c) => c.category === g.category);
+    if (!items.length) return "";
+    return `<section>
+    <h2>${esc(g.heading)}</h2>
+    <p class="sp-muted">${esc(g.blurb)}</p>
+    <ul class="sp-related sp-stack">${items.map((c) => `<li><a href="/compare/${c.slug}"><strong>Outage Observer vs ${esc(c.name)}</strong></a> <span class="sp-muted">· ${esc(c.what)}</span></li>`).join("")}</ul>
+  </section>`;
+  }).join("");
   const body = `<nav class="sp-crumbs" aria-label="Breadcrumb"><a href="/">Home</a> / <span>Compare</span></nav>
 <main class="sp-main">
   <h1>How Outage Observer compares</h1>
@@ -1040,15 +1070,7 @@ function renderCompareHub(): string {
     <h2>What makes Outage Observer different</h2>
     <ul class="sp-related sp-stack">${OO_EDGE.map((e) => `<li><strong>${esc(e.title)}.</strong> ${esc(e.body)}</li>`).join("")}</ul>
   </section>
-  <section>
-    <h2>Honest comparisons</h2>
-    <p class="sp-muted">Fair, point-in-time comparisons with the closest tools. We credit what they do better, too.</p>
-    <ul class="sp-related sp-stack">${COMPETITORS.map((c) => `<li><a href="/compare/${c.slug}"><strong>Outage Observer vs ${esc(c.name)}</strong></a> — ${esc(c.what)}.</li>`).join("")}</ul>
-  </section>
-  <section>
-    <h2>A note on other tools</h2>
-    <p>If you came looking for an alternative to an uptime monitor (which checks whether your own site is up) or a status-page host (which publishes your status), those solve a different problem. Outage Observer watches the third-party services you rely on. <a href="/about">More on how it works</a>.</p>
-  </section>
+  ${groups}
   <section>
     <h2>Try it</h2>
     <p>It's free and needs no signup. <a href="/">Open the live board</a>, pick the services you depend on, and get alerts where you want them.</p>
@@ -1056,11 +1078,11 @@ function renderCompareHub(): string {
 </main>`;
   return shell({
     title: "How Outage Observer compares · free status aggregator",
-    description: "Honest comparisons of Outage Observer with the closest status-aggregation tools. Free, no account, official status feeds only, alerts everywhere you already are.",
+    description: "Honest comparisons of Outage Observer with status aggregators, uptime monitors, and status-page tools. Free, no account, official status feeds only, alerts everywhere you already are.",
     canonical: SITE + "/compare",
     jsonld: [
       crumbLd([{ name: "Home", path: "/" }, { name: "Compare", path: "/compare" }]),
-      { "@context": "https://schema.org", "@type": "CollectionPage", name: "How Outage Observer compares", url: SITE + "/compare", isPartOf: { "@type": "WebSite", name: "Outage Observer", url: SITE + "/" } },
+      { "@context": "https://schema.org", "@type": "CollectionPage", name: "How Outage Observer compares", url: SITE + "/compare", isPartOf: { "@type": "WebSite", name: "Outage Observer", url: SITE + "/" }, about: COMPETITORS.map((c) => ({ "@type": "Thing", name: c.name, url: `${SITE}/compare/${c.slug}` })) },
     ],
     body,
     image: `${SITE}/og/default.png`,
@@ -1069,11 +1091,16 @@ function renderCompareHub(): string {
 
 function renderComparePage(c: Competitor): string {
   const canonical = `${SITE}/compare/${c.slug}`;
-  const rows = c.table.map((r) => `<tr><th scope="row">${esc(r.label)}</th><td>${esc(r.oo)}</td><td>${esc(r.them)}</td></tr>`).join("");
+  const isAlt = c.category === "aggregator" || c.category === "crowd";   // we're a real alternative vs a different tool
+  const intro = isAlt
+    ? `${esc(c.name)} is ${esc(c.what)}. Outage Observer is a free, no-account alternative. Here's an honest comparison.`
+    : `${esc(c.name)} is ${esc(c.what)}. That's a different job from Outage Observer, which watches the services you depend on. Here's the difference, and when you'd want each.`;
+  // Mobile: data-label lets the table reflow into cards instead of scrolling.
+  const rows = c.table.map((r) => `<tr><th scope="row">${esc(r.label)}</th><td data-label="Outage Observer">${esc(r.oo)}</td><td data-label="${esc(c.name)}">${esc(r.them)}</td></tr>`).join("");
   const body = `<nav class="sp-crumbs" aria-label="Breadcrumb"><a href="/">Home</a> / <a href="/compare">Compare</a> / <span>${esc(c.name)}</span></nav>
 <main class="sp-main">
   <h1>Outage Observer vs ${esc(c.name)}</h1>
-  <p class="sp-answer">${esc(c.name)} is ${esc(c.what)}. Outage Observer is a free, no-account status board and alerts for the services you depend on. Here's an honest comparison.</p>
+  <p class="sp-answer">${intro}</p>
   <p class="sp-meta">Reviewed 18 June 2026 · <a href="${esc(c.site)}" target="_blank" rel="noopener nofollow">${esc(c.name)} →</a></p>
   <section>
     <h2>At a glance</h2>
@@ -1097,19 +1124,78 @@ function renderComparePage(c: Competitor): string {
     <p>Free, no signup. <a href="/">Open the board</a>, or see <a href="/compare">all comparisons</a>.</p>
   </section>
 </main>`;
+  const faqA1 = isAlt
+    ? `Outage Observer is a free, no-account status board and alerts for the services you depend on. ${c.name} is ${c.what}, a paid product that requires an account. ${c.chooseUs}`
+    : `Not exactly: they do different jobs. ${c.name} is ${c.what}; Outage Observer watches the third-party services you depend on and tells you when one of them breaks. ${c.chooseUs}`;
   const faq = {
     "@context": "https://schema.org",
     "@type": "FAQPage",
     mainEntity: [
-      { "@type": "Question", name: `Is Outage Observer a free ${c.name} alternative?`, acceptedAnswer: { "@type": "Answer", text: `Outage Observer is a free, no-account status board and alerts for the services you depend on. ${c.name} is ${c.what}, a paid product that requires an account. ${c.chooseUs}` } },
+      { "@type": "Question", name: `Is Outage Observer a ${c.name} alternative?`, acceptedAnswer: { "@type": "Answer", text: faqA1 } },
       { "@type": "Question", name: `What is the difference between Outage Observer and ${c.name}?`, acceptedAnswer: { "@type": "Answer", text: c.weAreDifferent.join(" ") } },
     ],
   };
   return shell({
-    title: `Outage Observer vs ${c.name} — a free, no-account alternative`,
-    description: `Outage Observer vs ${c.name}: a free, no-signup status board with official-source-only alerts and no false alarms. An honest comparison, including where ${c.name} is stronger.`,
+    title: `Outage Observer vs ${c.name}: ${isAlt ? "a free, no-account alternative" : "what's the difference?"}`,
+    description: isAlt
+      ? `Outage Observer vs ${c.name}: a free, no-signup status board with official-source-only alerts and no false alarms. An honest comparison, including where ${c.name} is stronger.`
+      : `Outage Observer vs ${c.name}: they do different jobs. ${c.name} monitors or hosts your own; Outage Observer watches the services you depend on. An honest, side-by-side comparison.`,
     canonical,
     jsonld: [crumbLd([{ name: "Home", path: "/" }, { name: "Compare", path: "/compare" }, { name: c.name, path: `/compare/${c.slug}` }]), faq],
+    body,
+    image: `${SITE}/og/default.png`,
+  });
+}
+
+// ---- /status/category/<slug> : per-category "is X down?" landing pages ----
+function catSlug(name: string): string {
+  return name.toLowerCase().replace(/&/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+}
+const CATEGORY_BY_SLUG = new Map(CATEGORY_ORDER.map((c) => [catSlug(c), c] as const));
+
+async function renderCategoryPage(env: Env, category: string): Promise<string> {
+  const [board, checkedAt] = await Promise.all([getBoard(env), getCheckedAt(env)]);
+  const byId = new Map((board?.providers ?? []).map((e) => [e.id, e] as const));
+  const inCat = CATALOG.filter((p) => p.category === category);
+  const slug = catSlug(category);
+  const asOf = checkedAt ? `Updated ${stamp(checkedAt)}.` : "Updating every minute.";
+  const names = inCat.slice(0, 4).map((p) => p.name).join(", ");
+  const down = inCat.filter((p) => { const l = levelOf(byId.get(p.id)); return l !== "operational" && l !== "unknown"; });
+  const summary = down.length
+    ? `${down.length} of ${inCat.length} are reporting issues right now.`
+    : `All ${inCat.length} are operational right now.`;
+  const list = inCat.map((p) => `<li><a href="/status/${p.id}"><span class="sp-dir-name">${esc(p.name)}</span>${statusPill(levelOf(byId.get(p.id)))}</a></li>`).join("");
+  const related = CATEGORY_ORDER.filter((c) => c !== category && CATALOG.some((p) => p.category === c));
+
+  const body = `<nav class="sp-crumbs" aria-label="Breadcrumb"><a href="/">Home</a> / <a href="/status">Status</a> / <span>${esc(category)}</span></nav>
+<main class="sp-main">
+  <h1>${esc(category)} status</h1>
+  <p class="sp-answer">Live status of the ${inCat.length} providers Outage Observer tracks in ${esc(category)}: ${esc(names)}, and more. ${summary} ${asOf}</p>
+  <section class="sp-cat"><ul class="sp-dir">${list}</ul></section>
+  <section>
+    <h2>Get alerted</h2>
+    <p>Pick the ones you depend on and Outage Observer pings you the moment one changes state, free and with no account. <a href="/">Open the board</a> or see <a href="/alerts">all the ways to get alerts</a>.</p>
+  </section>
+  <section>
+    <h2>Other categories</h2>
+    <ul class="sp-related">${related.map((c) => `<li><a href="/status/category/${catSlug(c)}">${esc(c)}</a></li>`).join("")}</ul>
+  </section>
+</main>`;
+  return shell({
+    title: `${category} status · live · Outage Observer`,
+    description: `Is ${names} down? Live status of ${inCat.length} ${esc(category).toLowerCase()} providers, updated every minute. Free, no account.`,
+    canonical: `${SITE}/status/category/${slug}`,
+    jsonld: [
+      crumbLd([{ name: "Home", path: "/" }, { name: "Status", path: "/status" }, { name: category, path: `/status/category/${slug}` }]),
+      {
+        "@context": "https://schema.org",
+        "@type": "ItemList",
+        name: `${category} status`,
+        url: `${SITE}/status/category/${slug}`,
+        numberOfItems: inCat.length,
+        itemListElement: inCat.map((p, i) => ({ "@type": "ListItem", position: i + 1, name: p.name, url: `${SITE}/status/${p.id}` })),
+      },
+    ],
     body,
     image: `${SITE}/og/default.png`,
   });

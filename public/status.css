@@ -123,7 +123,18 @@ a.inc-name:hover { color: var(--oo-accent); }
 .cmp tbody th { color: var(--oo-text-muted); font-family: var(--oo-font-mono); font-size: var(--oo-text-xs); letter-spacing: var(--oo-tracking-mono); font-weight: var(--oo-weight-regular); white-space: nowrap; }
 .cmp tbody td { color: var(--oo-text-secondary); }
 .cmp tbody td:first-of-type { color: var(--oo-text-primary); }
-@media (max-width: 560px) { .cmp { display: block; overflow-x: auto; white-space: nowrap; } .cmp td, .cmp th { white-space: normal; min-width: 120px; } }
+/* On phones, reflow the comparison table into one card per row (no horizontal
+   scroll): the metric is the card title, each value is prefixed with its column
+   ("Outage Observer:" / the competitor) via the data-label attribute. */
+@media (max-width: 560px) {
+  .cmp thead { display: none; }
+  .cmp, .cmp tbody, .cmp tr, .cmp th, .cmp td { display: block; }
+  .cmp tr { border: 1px solid var(--oo-border); border-radius: var(--oo-radius-md); padding: 12px 14px; margin-bottom: 10px; }
+  .cmp tbody th { border: none; padding: 0 0 8px; color: var(--oo-text-primary); font-family: var(--oo-font-sans); font-size: var(--oo-text-md); font-weight: var(--oo-weight-semibold); letter-spacing: normal; white-space: normal; }
+  .cmp tbody td { border: none; padding: 3px 0; }
+  .cmp tbody td:first-of-type { color: var(--oo-text-secondary); }
+  .cmp td::before { content: attr(data-label) ": "; color: var(--oo-text-muted); font-family: var(--oo-font-mono); font-size: var(--oo-text-xs); letter-spacing: var(--oo-tracking-mono); }
+}
 
 /* ---- Mac popover mockup (faithful recreation, not a screenshot) ---- */
 .mac-mock {
