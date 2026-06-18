@@ -107,7 +107,7 @@ ${ld}
 </header>
 ${opts.body}
 <footer class="sp-foot">
-  <a href="/about">about</a> · <a href="/mac">mac</a> · <a href="/alerts">alerts</a><br/>
+  <a href="/about">about</a> · <a href="/mac">mac</a> · <a href="/alerts">alerts</a> · <a href="/privacy">privacy</a> · <a href="/terms">terms</a><br/>
   <a href="https://ekpani.com" target="_blank" rel="noopener noreferrer">an ekpani tool</a>
 </footer>
 </div>
@@ -474,6 +474,7 @@ export async function renderSitemap(env: Env): Promise<string> {
     { loc: SITE + "/about", priority: "0.5", freq: "monthly" },
     { loc: SITE + "/support", priority: "0.6", freq: "monthly" },
     { loc: SITE + "/privacy", priority: "0.3", freq: "yearly" },
+    { loc: SITE + "/terms", priority: "0.3", freq: "yearly" },
     ...CATALOG.map((p) => ({ loc: `${SITE}/status/${p.id}`, priority: "0.7", freq: "hourly" })),
     ...POINTERS.map((p) => ({ loc: `${SITE}/status/${p.id}`, priority: "0.4", freq: "weekly" })),
   ];
@@ -557,6 +558,7 @@ export async function handleSeo(env: Env, url: URL): Promise<Response | null> {
     });
   }
   if (path === "/privacy") return html(renderPrivacy());
+  if (path === "/terms") return html(renderTerms());
   if (path === "/about") return html(renderAbout());
   if (path === "/support") return html(renderSupport());
   if (path === "/mac") return html(renderMac());
@@ -864,6 +866,55 @@ function renderPrivacy(): string {
         "@type": "WebPage",
         name: "Privacy",
         url: SITE + "/privacy",
+        isPartOf: { "@type": "WebSite", name: "Outage Observer", url: SITE + "/" },
+      },
+    ],
+    body,
+  });
+}
+
+function renderTerms(): string {
+  const body = `<nav class="sp-crumbs" aria-label="Breadcrumb"><a href="/">Home</a> / <span>Terms</span></nav>
+<main class="sp-main">
+  <h1>Terms of Service</h1>
+  <p class="sp-answer">Outage Observer is a free service that aggregates providers' official status pages and notifies you when one changes state. By using it you agree to these terms.</p>
+  <p class="sp-meta">Last updated 18 June 2026.</p>
+  <section>
+    <h2>The service</h2>
+    <p>Outage Observer reads the public status sources that providers publish and reports what it sees, on a best-effort basis. It is provided "as is" and "as available", with no guarantee of accuracy, completeness, timeliness, or uptime. It is not a substitute for a provider's own status page, and we are not affiliated with the providers we monitor.</p>
+  </section>
+  <section>
+    <h2>No warranty and limited liability</h2>
+    <p>Alerts may be delayed, missed, duplicated, or incorrect, for example when a provider's own status source is itself late or wrong. Do not rely on Outage Observer as your sole source of truth for an outage. To the fullest extent permitted by law, Ekpani is not liable for any loss or damage arising from use of, or reliance on, the service, including missed or incorrect alerts.</p>
+  </section>
+  <section>
+    <h2>Acceptable use</h2>
+    <p>Use the service lawfully. Don't attempt to disrupt, overload, reverse-engineer, or abuse it, or use it to infringe others' rights. Keep automated access reasonable; we may rate-limit or block abuse to keep the service running for everyone.</p>
+  </section>
+  <section>
+    <h2>Availability and changes</h2>
+    <p>The service is free and needs no account. We may add, change, or discontinue any part of it at any time, and we may update these terms. Continued use after a change means you accept it.</p>
+  </section>
+  <section>
+    <h2>Trademarks</h2>
+    <p>Provider names and logos belong to their respective owners and are used only to identify the service being monitored. Their use does not imply any affiliation or endorsement.</p>
+  </section>
+  <section>
+    <h2>Contact</h2>
+    <p>Outage Observer is built by <a href="${EKPANI}" target="_blank" rel="noopener noreferrer">Ekpani</a>. Questions: <a href="${REPO}" target="_blank" rel="noopener noreferrer">github.com/ekpani/outage-observer</a>. See also our <a href="/privacy">Privacy policy</a>.</p>
+  </section>
+</main>`;
+  return shell({
+    title: "Terms of Service · Outage Observer",
+    description: "Terms of Service for Outage Observer, a free, best-effort status aggregator and alerting service by Ekpani.",
+    canonical: SITE + "/terms",
+    jsonld: [
+      crumbLd([{ name: "Home", path: "/" }, { name: "Terms", path: "/terms" }]),
+      {
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        name: "Terms of Service",
+        url: SITE + "/terms",
         isPartOf: { "@type": "WebSite", name: "Outage Observer", url: SITE + "/" },
       },
     ],

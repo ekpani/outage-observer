@@ -4,7 +4,7 @@
 // token (stored as a "slack-bot" target keyed on the channel id).
 import { type Env } from "./telegram";
 import { statusText, listText, resolveMany, displayName, HELP } from "./botcommands";
-import { upsertTarget, setTargetSubs, getTargetByChannelAddress, getTargetSubs, deleteTargetByChannelAddress, setSlackTeam, getSlackToken } from "./store";
+import { upsertTarget, setTargetSubs, getTargetByChannelAddress, getTargetSubs, deleteTargetByChannelAddress, setSlackTeam } from "./store";
 import { renderNotice } from "./seo";
 
 const CH = "slack-bot";
@@ -59,25 +59,12 @@ export async function handleSlackCommand(env: Env, request: Request): Promise<Re
   if (cmd === "watch") {
     const ids = resolveMany(arg);
     if (!ids.length) return reply("No known services matched. Try ids like `aws openai stripe`.");
-    await joinChannel(env, channelId, teamId);    // best-effort; needed to post in public channels
     const { id } = await upsertTarget(env, CH, channelId, JSON.stringify({ team: teamId }), null);
     const merged = [...new Set([...await getTargetSubs(env, id), ...ids])];
     await setTargetSubs(env, id, merged);
     return reply(`Now watching ${ids.map(displayName).join(", ")} in this channel. (${merged.length} total) If alerts don't appear, run \`/invite @Outage Observer\` here.`, true);
   }
   return reply(HELP);
-}
-
-/** Best-effort join so the bot can post in a public channel; harmless if it's
- *  already a member or the channel is private (the user then /invites it). */
-async function joinChannel(env: Env, channelId: string, teamId: string): Promise<void> {
-  const token = await getSlackToken(env, teamId);
-  if (!token) return;
-  await fetch("https://slack.com/api/conversations.join", {
-    method: "POST",
-    headers: { "content-type": "application/json; charset=utf-8", authorization: `Bearer ${token}` },
-    body: JSON.stringify({ channel: channelId }),
-  }).then((r) => r.body?.cancel().catch(() => {})).catch(() => {});
 }
 
 // ---- OAuth install flow (multi-workspace) -----------------------------------
