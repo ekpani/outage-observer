@@ -107,9 +107,6 @@ const C = [
   // Monitoring
   ["newrelic", "New Relic", "Monitoring", "https://status.newrelic.com"],
   ["honeycomb", "Honeycomb", "Monitoring", "https://status.honeycomb.io"],
-  ["betterstack", "Better Stack", "Monitoring", "https://status.betterstack.com"],
-  ["checkly", "Checkly", "Monitoring", "https://status.checklyhq.com"],
-  ["pingdom", "Pingdom", "Monitoring", "https://status.pingdom.com"],
   ["bugsnag", "Bugsnag", "Monitoring", "https://status.bugsnag.com"],
   ["rollbar", "Rollbar", "Monitoring", "https://status.rollbar.com"],
   ["launchdarkly", "LaunchDarkly", "Monitoring", "https://status.launchdarkly.com"],

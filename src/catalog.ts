@@ -184,6 +184,18 @@ export const CATALOG: Provider[] = [
   { id: "duolingo", name: "Duolingo", category: "Consumer & lifestyle", adapter: "statuspage", url: "https://status.duolingo.com" },
   { id: "proton", name: "Proton", category: "Consumer & lifestyle", adapter: "statuspage", url: "https://status.proton.me" },
   { id: "strava", name: "Strava", category: "Consumer & lifestyle", adapter: "statuspage", url: "https://status.strava.com" },
+
+  // Widely-used services we were missing (probed live).
+  { id: "postman", name: "Postman", category: "Dev & CI", adapter: "statuspage", url: "https://status.postman.com" },
+  { id: "pypi", name: "PyPI", category: "Dev & CI", adapter: "statuspage", url: "https://status.python.org" },
+  { id: "neon", name: "Neon", category: "Data & backend", adapter: "instatus", url: "https://neon.instatus.com" },
+  { id: "hubspot", name: "HubSpot", category: "Collaboration", adapter: "statuspage", url: "https://status.hubspot.com" },
+  { id: "docusign", name: "DocuSign", category: "Collaboration", adapter: "statuspage", url: "https://status.docusign.com" },
+  { id: "box", name: "Box", category: "Collaboration", adapter: "statuspage", url: "https://status.box.com" },
+  { id: "trello", name: "Trello", category: "Collaboration", adapter: "statuspage", url: "https://trello.status.atlassian.com" },
+  { id: "squarespace", name: "Squarespace", category: "Commerce & CMS", adapter: "statuspage", url: "https://status.squarespace.com" },
+  { id: "wix", name: "Wix", category: "Commerce & CMS", adapter: "statuspage", url: "https://status.wix.com" },
+  { id: "klarna", name: "Klarna", category: "Finance & crypto", adapter: "statuspage", url: "https://status.klarna.com" },
 ];
 
 /** INTERNAL polling-freshness set only — NOT a user-facing "essentials" list.
