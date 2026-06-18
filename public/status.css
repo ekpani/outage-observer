@@ -62,6 +62,10 @@ a:hover { text-decoration: underline; }
 .sp-history .inc-name { flex: 1; min-width: 0; font-size: var(--oo-text-md); color: var(--oo-text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 a.inc-name:hover { color: var(--oo-accent); }
 
+/* Call-to-action link to an external official source (pointer pages) */
+.sp-cta { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border: 1px solid var(--oo-border); border-radius: var(--oo-radius-md); font-family: var(--oo-font-mono); font-size: var(--oo-text-sm); letter-spacing: var(--oo-tracking-mono); color: var(--oo-text-primary); transition: border-color .15s ease, color .15s ease; }
+.sp-cta:hover { border-color: var(--oo-accent); color: var(--oo-accent); }
+
 /* Related */
 .sp-related { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: var(--oo-space-2) var(--oo-space-4); }
 .sp-related a { font-family: var(--oo-font-mono); font-size: var(--oo-text-sm); letter-spacing: var(--oo-tracking-mono); }

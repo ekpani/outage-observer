@@ -1,4 +1,5 @@
 import { CATALOG, CATEGORY_ORDER, ALIASES, type Provider } from "./catalog";
+import { POINTERS, POINTER_BY_ID, type Pointer } from "./pointers";
 import { LABEL } from "./labels";
 import { getBoard, getCheckedAt, getHistory, getProviderStats, type BoardEntry } from "./store";
 import { type Env } from "./telegram";
@@ -252,6 +253,68 @@ export async function renderProviderPage(env: Env, provider: Provider): Promise<
   });
 }
 
+// ---- /status/<id> for a provider with no live feed (honest pointer page) ----
+// Answers the same "is X down?" query, but instead of a status it explains there
+// is no machine-readable feed and sends the visitor to the official source. No
+// status pill claim, no SpecialAnnouncement — it can never imply up or down.
+export function renderPointerPage(pointer: Pointer): string {
+  const canonical = `${SITE}/status/${pointer.id}`;
+  const related = CATALOG.filter((p) => p.category === pointer.category).slice(0, 8);
+
+  const body = `<nav class="sp-crumbs" aria-label="Breadcrumb"><a href="/">Home</a> / <a href="/status">Status</a> / <span>${esc(pointer.name)}</span></nav>
+<main class="sp-main">
+  <div class="sp-titlerow">
+    <h1>Is ${esc(pointer.name)} down?</h1>
+    <span class="pill pill-unknown"><span class="dot"></span>No live feed</span>
+  </div>
+  <p class="sp-answer">Outage Observer can't confirm ${esc(pointer.name)}'s status live. ${esc(pointer.note)}</p>
+  <p class="sp-meta">${esc(pointer.category)} · check the official source below for the real-time answer.</p>
+  <section>
+    <h2>Official ${esc(pointer.name)} status</h2>
+    <p><a class="sp-cta" href="${esc(pointer.link)}" target="_blank" rel="noopener nofollow">${esc(pointer.linkLabel)} →</a></p>
+  </section>
+  <section>
+    <h2>Why isn't ${esc(pointer.name)} tracked live?</h2>
+    <p>Outage Observer only reports a status when a provider publishes an official, machine-readable feed it can check every minute. ${esc(pointer.name)} doesn't, so rather than guess — or trust an unattended page that could show green during a real outage — we point you to where ${esc(pointer.name)} actually announces incidents. If ${esc(pointer.name)} ever ships a real status feed, we'll add full tracking and alerts.</p>
+  </section>
+  ${related.length ? `<section>
+    <h2>${esc(pointer.category)} services we track live</h2>
+    <ul class="sp-related">${related.map((p) => `<li><a href="/status/${p.id}">${esc(p.name)}</a></li>`).join("")}</ul>
+  </section>` : ""}
+  <section>
+    <h2>Track the services that do publish status</h2>
+    <p>Outage Observer watches ${CATALOG.length} providers with official feeds and pings you the moment one changes state. <a href="/status">Browse the directory</a> or <a href="/">open the live board</a>.</p>
+  </section>
+</main>`;
+
+  const faq = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: [{
+      "@type": "Question",
+      name: `Is ${pointer.name} down right now?`,
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: `Outage Observer can't confirm — ${pointer.name} doesn't publish a machine-readable status feed. For official outage updates, check ${pointer.linkLabel} (${pointer.link}).`,
+      },
+    }],
+  };
+  const breadcrumb = crumbLd([
+    { name: "Home", path: "/" },
+    { name: "Status", path: "/status" },
+    { name: pointer.name, path: `/status/${pointer.id}` },
+  ]);
+
+  return shell({
+    title: `Is ${pointer.name} down? ${pointer.name} status · Outage Observer`,
+    description: `Is ${pointer.name} down? ${pointer.name} doesn't publish a live status feed — see where it posts official outage updates, and track the providers that do with Outage Observer.`,
+    canonical,
+    jsonld: [breadcrumb, faq],
+    body,
+    image: `${SITE}/og/default.png`,
+  });
+}
+
 // ---- /status : the directory of all providers ----
 export async function renderDirectory(env: Env): Promise<string> {
   const [board, checkedAt] = await Promise.all([getBoard(env), getCheckedAt(env)]);
@@ -270,12 +333,22 @@ export async function renderDirectory(env: Env): Promise<string> {
     sections += `</ul></section>`;
   }
 
+  // Providers people search for that we deliberately don't track live (no feed).
+  const notTracked = POINTERS.length
+    ? `<section class="sp-cat"><h2>Not tracked live</h2>
+    <p class="sp-muted">These don't publish an official status feed, so we point you to where they post outages instead.</p>
+    <ul class="sp-dir">${POINTERS.map((p) =>
+      `<li><a href="/status/${p.id}"><span class="sp-dir-name">${esc(p.name)}</span><span class="pill pill-unknown"><span class="dot"></span>No feed</span></a></li>`,
+    ).join("")}</ul></section>`
+    : "";
+
   const body = `<nav class="sp-crumbs" aria-label="Breadcrumb"><a href="/">Home</a> / <span>Status</span></nav>
 <main class="sp-main">
   <h1>Service status directory</h1>
   <p class="sp-answer">Live status of ${CATALOG.length} infrastructure and AI providers that Outage Observer monitors. ${asOf}</p>
   <p class="sp-meta">Looking for one service? Try <a href="/status/aws">AWS</a>, <a href="/status/cloudflare">Cloudflare</a>, <a href="/status/openai">OpenAI</a>, or <a href="/status/stripe">Stripe</a>.</p>
   ${sections}
+  ${notTracked}
 </main>`;
 
   const breadcrumb = {
@@ -317,6 +390,7 @@ export async function renderSitemap(env: Env): Promise<string> {
     { loc: SITE + "/support", priority: "0.6", freq: "monthly" },
     { loc: SITE + "/privacy", priority: "0.3", freq: "yearly" },
     ...CATALOG.map((p) => ({ loc: `${SITE}/status/${p.id}`, priority: "0.7", freq: "hourly" })),
+    ...POINTERS.map((p) => ({ loc: `${SITE}/status/${p.id}`, priority: "0.4", freq: "weekly" })),
   ];
   const body = urls.map((u) =>
     `  <url><loc>${u.loc}</loc><lastmod>${lastmod}</lastmod><changefreq>${u.freq}</changefreq><priority>${u.priority}</priority></url>`,
@@ -342,6 +416,13 @@ export async function renderLlms(env: Env): Promise<string> {
     for (const p of inCat) {
       const level = levelOf(byId.get(p.id));
       lines.push(`- [Is ${p.name} down?](${SITE}/status/${p.id}): ${p.name} (${cat}) — currently ${LABEL[level].toLowerCase()}`);
+    }
+  }
+  if (POINTERS.length) {
+    lines.push("");
+    lines.push("## Not tracked live (no official feed)");
+    for (const p of POINTERS) {
+      lines.push(`- [Is ${p.name} down?](${SITE}/status/${p.id}): ${p.name} (${p.category}) — no machine-readable status feed; official outage updates at ${p.link}`);
     }
   }
   lines.push("");
@@ -371,13 +452,14 @@ export async function handleSeo(env: Env, url: URL): Promise<Response | null> {
     try { id = decodeURIComponent(path.slice("/status/".length).replace(/\/$/, "")); }
     catch { return new Response(notFoundPage(), { status: 404, headers: { "content-type": "text/html; charset=utf-8" } }); }
     const provider = BY_ID.get(id);
-    if (!provider) {
-      // Common-name alias (e.g. /status/twitter -> /status/x), else 404.
-      const alias = ALIASES[id];
-      if (alias && BY_ID.has(alias)) return Response.redirect(`${SITE}/status/${alias}`, 301);
-      return new Response(notFoundPage(), { status: 404, headers: { "content-type": "text/html; charset=utf-8" } });
-    }
-    return html(await renderProviderPage(env, provider));
+    if (provider) return html(await renderProviderPage(env, provider));
+    // Providers we acknowledge but don't poll (no machine-readable feed).
+    const pointer = POINTER_BY_ID.get(id);
+    if (pointer) return html(renderPointerPage(pointer));
+    // Common-name alias (e.g. /status/twitter -> /status/x), else 404.
+    const alias = ALIASES[id];
+    if (alias && BY_ID.has(alias)) return Response.redirect(`${SITE}/status/${alias}`, 301);
+    return new Response(notFoundPage(), { status: 404, headers: { "content-type": "text/html; charset=utf-8" } });
   }
   if (path === "/sitemap.xml") {
     return new Response(await renderSitemap(env), {

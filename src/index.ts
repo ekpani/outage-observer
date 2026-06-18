@@ -7,6 +7,7 @@ import { handleFeed } from "./feed";
 import { handleSeo } from "./seo";
 import { detectWebhookKind, sendWebhookConfirmation } from "./channels";
 import { CATALOG, ALIASES } from "./catalog";
+import { POINTER_IDS } from "./pointers";
 import { isGeo } from "./regions";
 
 // The Durable Object that runs the reliable 1-minute poll loop. Must be exported
@@ -290,7 +291,7 @@ export default {
     if (request.method === "GET") {
       const seg = url.pathname.slice(1);
       if (/^[a-z0-9-]+$/.test(seg)) {
-        const target = PROVIDER_IDS.has(seg) ? seg : ALIASES[seg];
+        const target = (PROVIDER_IDS.has(seg) || POINTER_IDS.has(seg)) ? seg : ALIASES[seg];
         if (target) return Response.redirect(new URL(`/status/${target}`, url.origin).toString(), 301);
       }
     }
