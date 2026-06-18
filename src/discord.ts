@@ -57,7 +57,7 @@ export async function handleDiscordInteraction(env: Env, request: Request, ctx: 
 
   if (!guildId) return reply("Use this in a server channel, not a DM.");
 
-  if (name === "status") return say(await statusText(env, optStr("provider")));
+  if (name === "status") return reply(await statusText(env, optStr("provider")));   // private quick check
   if (name === "list") return say(await listText(env, CH, channelId));
   if (name === "stop") {
     const removed = await deleteTargetByChannelAddress(env, CH, channelId);

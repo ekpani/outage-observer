@@ -49,7 +49,7 @@ export async function handleSlackCommand(env: Env, request: Request): Promise<Re
   const cmd = (cmdRaw || "help").toLowerCase();
   const arg = rest.join(" ");
 
-  if (cmd === "status") return reply(await statusText(env, arg), true);
+  if (cmd === "status") return reply(await statusText(env, arg));   // private quick check
   if (cmd === "list") return reply(await listText(env, CH, channelId), true);
   if (cmd === "stop") {
     const removed = await deleteTargetByChannelAddress(env, CH, channelId);
