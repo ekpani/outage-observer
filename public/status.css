@@ -66,6 +66,17 @@ a.inc-name:hover { color: var(--oo-accent); }
 .sp-cta { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border: 1px solid var(--oo-border); border-radius: var(--oo-radius-md); font-family: var(--oo-font-mono); font-size: var(--oo-text-sm); letter-spacing: var(--oo-tracking-mono); color: var(--oo-text-primary); transition: border-color .15s ease, color .15s ease; }
 .sp-cta:hover { border-color: var(--oo-accent); color: var(--oo-accent); }
 
+/* Opt-in click-to-load embed (e.g. an X timeline). Until clicked, no third-party
+   script runs — this is the styled placeholder the visitor taps to load it. */
+.sp-embed { margin: 4px 0 var(--oo-space-3); }
+.sp-embed-load { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; width: 100%; max-width: 480px; padding: 18px 20px; background: transparent; border: 1px solid var(--oo-border); border-radius: var(--oo-radius-lg); cursor: pointer; text-align: left; transition: border-color .15s ease; }
+.sp-embed-load:hover { border-color: var(--oo-accent); }
+.sp-embed-x { color: var(--oo-text-primary); display: block; }
+.sp-embed-cta { font-size: var(--oo-text-md); color: var(--oo-text-primary); font-weight: var(--oo-weight-medium); }
+.sp-embed-note { font-family: var(--oo-font-mono); font-size: var(--oo-text-xs); color: var(--oo-text-muted); letter-spacing: var(--oo-tracking-mono); }
+.sp-embed .twitter-timeline { max-width: 100% !important; }
+.sp-embed iframe { border-radius: var(--oo-radius-md) !important; max-width: 100% !important; }
+
 /* Related */
 .sp-related { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: var(--oo-space-2) var(--oo-space-4); }
 .sp-related a { font-family: var(--oo-font-mono); font-size: var(--oo-text-sm); letter-spacing: var(--oo-tracking-mono); }

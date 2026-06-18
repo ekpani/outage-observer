@@ -261,6 +261,37 @@ export function renderPointerPage(pointer: Pointer): string {
   const canonical = `${SITE}/status/${pointer.id}`;
   const related = CATALOG.filter((p) => p.category === pointer.category).slice(0, 8);
 
+  // Opt-in embed: rendered as a click-to-load card so X's SDK never runs on page
+  // load (privacy promise stays intact). The link below is always the fallback.
+  const officialSection = pointer.embed
+    ? `<section>
+    <h2>Latest from @${esc(pointer.embed.handle)}</h2>
+    <div class="sp-embed" id="x-embed" data-handle="${esc(pointer.embed.handle)}">
+      <button type="button" class="sp-embed-load" id="x-embed-load" aria-label="Load the latest posts from @${esc(pointer.embed.handle)} on X">
+        <svg class="sp-embed-x" viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+        <span class="sp-embed-cta">Show latest @${esc(pointer.embed.handle)} posts</span>
+        <span class="sp-embed-note">Loads from x.com — sets X cookies</span>
+      </button>
+    </div>
+    <p class="sp-meta"><a class="sp-cta" href="${esc(pointer.link)}" target="_blank" rel="noopener nofollow">Open ${esc(pointer.linkLabel)} →</a></p>
+  </section>
+  <script>
+  (function(){
+    var btn=document.getElementById('x-embed-load'); if(!btn) return;
+    btn.addEventListener('click', function(){
+      var box=document.getElementById('x-embed'); if(!box) return;
+      var h=box.getAttribute('data-handle');
+      var dark=(document.documentElement.getAttribute('data-theme')||'')==='dark'||(!document.documentElement.getAttribute('data-theme')&&matchMedia('(prefers-color-scheme: dark)').matches);
+      box.innerHTML='<a class="twitter-timeline" data-theme="'+(dark?'dark':'light')+'" data-chrome="noheader nofooter transparent" data-tweet-limit="5" data-height="560" href="https://twitter.com/'+h+'?ref_src=twsrc%5Etfw">Posts from @'+h+'</a>';
+      var s=document.createElement('script');s.src='https://platform.twitter.com/widgets.js';s.async=true;s.charset='utf-8';document.body.appendChild(s);
+    },{once:true});
+  })();
+  </script>`
+    : `<section>
+    <h2>Official ${esc(pointer.name)} status</h2>
+    <p><a class="sp-cta" href="${esc(pointer.link)}" target="_blank" rel="noopener nofollow">${esc(pointer.linkLabel)} →</a></p>
+  </section>`;
+
   const body = `<nav class="sp-crumbs" aria-label="Breadcrumb"><a href="/">Home</a> / <a href="/status">Status</a> / <span>${esc(pointer.name)}</span></nav>
 <main class="sp-main">
   <div class="sp-titlerow">
@@ -269,10 +300,7 @@ export function renderPointerPage(pointer: Pointer): string {
   </div>
   <p class="sp-answer">Outage Observer can't confirm ${esc(pointer.name)}'s status live. ${esc(pointer.note)}</p>
   <p class="sp-meta">${esc(pointer.category)} · check the official source below for the real-time answer.</p>
-  <section>
-    <h2>Official ${esc(pointer.name)} status</h2>
-    <p><a class="sp-cta" href="${esc(pointer.link)}" target="_blank" rel="noopener nofollow">${esc(pointer.linkLabel)} →</a></p>
-  </section>
+  ${officialSection}
   <section>
     <h2>Why isn't ${esc(pointer.name)} tracked live?</h2>
     <p>Outage Observer only reports a status when a provider publishes an official, machine-readable feed it can check every minute. ${esc(pointer.name)} doesn't, so rather than guess — or trust an unattended page that could show green during a real outage — we point you to where ${esc(pointer.name)} actually announces incidents. If ${esc(pointer.name)} ever ships a real status feed, we'll add full tracking and alerts.</p>
@@ -753,7 +781,11 @@ function renderPrivacy(): string {
   </section>
   <section>
     <h2>What we don't do</h2>
-    <p>No accounts, no analytics, no tracking, no advertising identifiers, no third-party SDKs. We do not build user profiles. Like any website, our server receives standard request logs (e.g. IP address) to serve traffic and stop abuse; these are not used to identify or track you and are not sold.</p>
+    <p>No accounts, no analytics, no tracking, no advertising identifiers, and no third-party SDKs loaded by default. We do not build user profiles. Like any website, our server receives standard request logs (e.g. IP address) to serve traffic and stop abuse; these are not used to identify or track you and are not sold.</p>
+  </section>
+  <section>
+    <h2>Optional embeds</h2>
+    <p>A few pages cover services that announce outages on X instead of a status feed. Those pages offer an <strong>opt-in</strong> embedded timeline that loads only if you click to load it — until then, nothing from X runs and no X cookies are set. If you do load it, that content is served by X under <a href="https://x.com/en/privacy" target="_blank" rel="noopener noreferrer">its own privacy policy</a>. There is always a plain link as an alternative.</p>
   </section>
   <section>
     <h2>Notifications</h2>

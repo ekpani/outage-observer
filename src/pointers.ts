@@ -17,6 +17,10 @@ export interface Pointer {
   linkLabel: string;
   /** One honest sentence on why there's no live feed. */
   note: string;
+  /** Optional opt-in embed of the provider's outage channel. Loaded only on a
+   *  click (never on page load), so no third-party SDK runs for visitors who
+   *  don't ask for it — keeping our "no third-party SDKs by default" promise. */
+  embed?: { kind: "x"; handle: string };
 }
 
 export const POINTERS: Pointer[] = [
@@ -27,6 +31,7 @@ export const POINTERS: Pointer[] = [
     link: "https://x.com/SpotifyStatus",
     linkLabel: "@SpotifyStatus on X",
     note: "Spotify doesn't publish a machine-readable status page; it posts outage updates on X.",
+    embed: { kind: "x", handle: "SpotifyStatus" },
   },
   {
     id: "netflix",
