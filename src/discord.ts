@@ -31,7 +31,10 @@ function json(body: unknown): Response {
   return new Response(JSON.stringify(body), { headers: { "content-type": "application/json" } });
 }
 function reply(content: string): Response {
-  return json({ type: 4, data: { content, flags: EPHEMERAL } });   // immediate ephemeral message
+  return json({ type: 4, data: { content, flags: EPHEMERAL } });   // private to the invoker
+}
+function say(content: string): Response {
+  return json({ type: 4, data: { content } });                     // visible to the whole channel
 }
 
 export async function handleDiscordInteraction(env: Env, request: Request, ctx: ExecutionContext): Promise<Response> {
@@ -54,19 +57,19 @@ export async function handleDiscordInteraction(env: Env, request: Request, ctx: 
 
   if (!guildId) return reply("Use this in a server channel, not a DM.");
 
-  if (name === "status") return reply(await statusText(env, optStr("provider")));
-  if (name === "list") return reply(await listText(env, CH, channelId));
+  if (name === "status") return say(await statusText(env, optStr("provider")));
+  if (name === "list") return say(await listText(env, CH, channelId));
   if (name === "stop") {
     const removed = await deleteTargetByChannelAddress(env, CH, channelId);
-    return reply(removed ? "Stopped. This channel no longer gets Outage Observer alerts." : "This channel wasn't watching anything.");
+    return removed ? say("Stopped. This channel no longer gets Outage Observer alerts.") : reply("This channel wasn't watching anything.");
   }
   if (name === "watch") {
     const ids = resolveMany(optStr("providers"));
     if (!ids.length) return reply("No known services matched. Try ids like `aws openai stripe`.");
-    // Creating the channel webhook can take a beat; defer and edit the reply so
-    // we never blow Discord's 3s interaction deadline.
+    // Creating the channel webhook can take a beat; defer (publicly) and edit the
+    // reply so we never blow Discord's 3s interaction deadline.
     ctx.waitUntil(doWatch(env, channelId, guildId, ids, body.token).catch((e) => console.error("discord watch failed", String(e))));
-    return json({ type: 5, data: { flags: EPHEMERAL } });  // deferred ephemeral
+    return json({ type: 5 });  // deferred, visible to the channel
   }
   return reply(HELP);
 }
