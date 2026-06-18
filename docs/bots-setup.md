@@ -52,6 +52,7 @@ Commands (identical on both): `/outage status <service>`, `/outage watch <servic
      },
      "features": {
        "bot_user": { "display_name": "Outage Observer", "always_online": true },
+       "app_home": { "home_tab_enabled": false, "messages_tab_enabled": false, "messages_tab_read_only_enabled": false },
        "slash_commands": [
          {
            "command": "/outage",
