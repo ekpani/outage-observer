@@ -73,7 +73,7 @@ let catalog: [CatalogEntry] = [
     CatalogEntry(id: "frontegg", name: "Frontegg", category: "Auth & identity"),
     CatalogEntry(id: "fusionauth", name: "FusionAuth", category: "Auth & identity"),
     CatalogEntry(id: "openai", name: "OpenAI", category: "AI & model providers"),
-    CatalogEntry(id: "anthropic", name: "Anthropic", category: "AI & model providers"),
+    CatalogEntry(id: "claude", name: "Claude", category: "AI & model providers"),
     CatalogEntry(id: "cohere", name: "Cohere", category: "AI & model providers"),
     CatalogEntry(id: "replicate", name: "Replicate", category: "AI & model providers"),
     CatalogEntry(id: "groq", name: "Groq", category: "AI & model providers"),

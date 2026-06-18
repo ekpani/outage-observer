@@ -104,7 +104,7 @@ export const CATALOG: Provider[] = [
 
   // AI & model providers
   { id: "openai", name: "OpenAI", category: "AI & model providers", adapter: "statuspage", url: "https://status.openai.com" },
-  { id: "anthropic", name: "Anthropic", category: "AI & model providers", adapter: "statuspage", url: "https://status.claude.com", link: "https://status.claude.com" },
+  { id: "claude", name: "Claude", category: "AI & model providers", adapter: "statuspage", url: "https://status.claude.com", link: "https://status.claude.com" },
   { id: "cohere", name: "Cohere", category: "AI & model providers", adapter: "statuspage", url: "https://status.cohere.com" },
   { id: "replicate", name: "Replicate", category: "AI & model providers", adapter: "statuspage", url: "https://replicatestatus.com" },
   { id: "groq", name: "Groq", category: "AI & model providers", adapter: "statuspage", url: "https://groqstatus.com" },
@@ -221,7 +221,7 @@ export const CATALOG: Provider[] = [
  *  decide what's essential to anyone. */
 export const PRIORITY_IDS = new Set<string>([
   "aws", "gcp", "azure", "cloudflare", "vercel", "netlify", "github", "npm",
-  "openai", "anthropic", "stripe", "slack", "discord", "twilio", "supabase", "mongodb",
+  "openai", "claude", "stripe", "slack", "discord", "twilio", "supabase", "mongodb",
 ]);
 
 /** A short, neutral set of commonly-watched services offered as INDIVIDUAL
@@ -229,7 +229,7 @@ export const PRIORITY_IDS = new Set<string>([
  *  blessed "essentials" — just a few suggestions to break the blank-page. The
  *  web board mirrors this list in app.js. */
 export const POPULAR_IDS: string[] = [
-  "cloudflare", "aws", "github", "vercel", "openai", "anthropic", "stripe", "slack",
+  "cloudflare", "aws", "github", "vercel", "openai", "claude", "stripe", "slack",
 ];
 
 /** Display order for the board, the directory, and the bot's onboarding picker.
@@ -238,6 +238,7 @@ export const POPULAR_IDS: string[] = [
  *  /status/twitter resolve to the X (Twitter) page (people still search "twitter"). */
 export const ALIASES: Record<string, string> = {
   twitter: "x",
+  anthropic: "claude",   // renamed; status now lives at status.claude.com
 };
 
 export const CATEGORY_ORDER: string[] = [
