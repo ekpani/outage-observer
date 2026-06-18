@@ -235,8 +235,7 @@ export async function renderProviderPage(env: Env, provider: Provider): Promise<
       `<li>${statusPill(h.level)}<time datetime="${new Date(h.at).toISOString()}">${stamp(h.at)}</time></li>`,
     ).join("") + `</ul>`;
   } else {
-    historyTitle = "Recent status changes";
-    historyRows = `<p class="sp-muted">No status changes recorded yet. Changes appear here as they happen.</p>`;
+    historyRows = `<p class="sp-muted">No recent incidents reported.</p>`;
   }
 
   const body = `<nav class="sp-crumbs" aria-label="Breadcrumb"><a href="/">Home</a> / <a href="/status">Status</a> / <span>${esc(provider.name)}</span></nav>
@@ -499,9 +498,9 @@ export async function renderLlms(env: Env): Promise<string> {
   const lines: string[] = [];
   lines.push("# Outage Observer");
   lines.push("");
-  lines.push("> Live status of the infrastructure and AI providers in your stack. Outage Observer aggregates the official status pages of " + CATALOG.length + " providers and reports the moment one changes state. Free, no login.");
+  lines.push("> Live status of the infrastructure and AI providers in your stack. Outage Observer aggregates the official status pages of " + CATALOG.length + " providers and reports the moment one changes state. Free, no account, no tracking. It reads only official status feeds — never synthetic checks or crowd reports — so it never raises a false alarm.");
   lines.push("");
-  lines.push("Outage Observer offers a public web board, a Telegram bot, Slack/Discord webhooks, browser push, and RSS feeds. Each provider has a page answering \"is X down?\" with its current status and recent changes.");
+  lines.push("Outage Observer works as a public web board, an installable web app (PWA), a native macOS menu-bar app, a Telegram bot, Slack and Discord apps, Slack/Discord incoming webhooks, browser push, and RSS/Atom feeds. Each provider has a page answering \"is X down?\" with its current status and recent incidents.");
   lines.push("");
   lines.push("## Provider status pages");
   for (const cat of CATEGORY_ORDER) {
@@ -532,13 +531,29 @@ export async function renderLlms(env: Env): Promise<string> {
     lines.push(`- [Outage Observer vs ${c.name}](${SITE}/compare/${c.slug}): ${c.name} is ${c.what}.`);
   }
   lines.push("");
-  lines.push("## Directory & feeds");
-  lines.push(`- [Service status directory](${SITE}/status): live status of all ${CATALOG.length} providers`);
-  lines.push(`- [Atom feed](${SITE}/feed.xml): every recent status change`);
+  lines.push("## Apps and integrations");
+  lines.push(`- [Web board](${SITE}/): pick the services you depend on; updates every minute. Free, no account.`);
+  lines.push("- Installable web app (PWA): add the board to your home screen for an app-like experience with web push, including on iOS 16.4+.");
+  lines.push(`- [Mac app](${SITE}/mac): a native macOS menu-bar app with notifications and Sparkle auto-update. Free, no account.`);
+  lines.push("- [Telegram bot](https://t.me/outageobserverbot): pick services and get alerts in Telegram; supports commands and region filtering.");
+  lines.push(`- Slack app: the /outage slash command (status, watch, list, stop, test) posts alerts to your channels. Install at ${SITE}/slack/install`);
+  lines.push("- Discord bot: /outage slash commands and per-channel alerts.");
+  lines.push("- Slack and Discord incoming webhooks: paste a channel webhook URL on the board to receive alerts there.");
+  lines.push("- Browser push (Web Push): notifications from the web board or the installed PWA.");
+  lines.push("- Region-aware alerting: for providers that report a region (AWS, Google Cloud), filter alerts to the regions you choose.");
   lines.push("");
-  lines.push("## Tools");
-  lines.push(`- [Live board](${SITE}/): interactive status board for your stack`);
-  lines.push("- [Telegram bot](https://t.me/outageobserverbot): alerts for the services you choose");
+  lines.push("## Feeds");
+  lines.push(`- [Atom feed of all changes](${SITE}/feed.xml)`);
+  lines.push(`- Per-provider feed: ${SITE}/feed/<id>.xml (for example ${SITE}/feed/stripe.xml)`);
+  lines.push(`- Just your stack: ${SITE}/feed.xml?ids=aws,stripe,openai`);
+  lines.push("");
+  lines.push("## Pages");
+  lines.push(`- [Service status directory](${SITE}/status): live status of all ${CATALOG.length} providers`);
+  lines.push(`- [About](${SITE}/about): what it is and how it works`);
+  lines.push(`- [Compare](${SITE}/compare): how Outage Observer compares to other tools`);
+  lines.push(`- [Get alerts](${SITE}/alerts): every way to get notified`);
+  lines.push(`- [Mac app](${SITE}/mac) · [Support & FAQ](${SITE}/support)`);
+  lines.push(`- [Privacy](${SITE}/privacy) · [Terms](${SITE}/terms) · [Security](${SITE}/security) · [Sub-processors](${SITE}/subprocessors)`);
   lines.push("");
   return lines.join("\n");
 }

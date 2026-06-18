@@ -36,6 +36,7 @@ export async function fetchRecentIncidents(provider: Provider, max = 5): Promise
     if (provider.adapter === "gcp") return await gcpIncidents(provider, max);
     if (provider.adapter === "x") return await xIncidents(provider, max);
     if (provider.adapter === "slack") return await slackIncidents(provider, max);
+    if (provider.adapter === "heroku") return await herokuIncidents(provider, max);
     return [];
   } catch {
     return [];
@@ -114,6 +115,24 @@ async function slackIncidents(provider: Provider, max: number): Promise<Incident
     if (out.length >= max) break;
   }
   return out;
+}
+
+/** Heroku status API: the catalog url is .../api/v4/current-status; recent
+ *  incidents (resolved + ongoing) live at .../api/v4/incidents as a flat array. */
+async function herokuIncidents(provider: Provider, max: number): Promise<IncidentRecord[]> {
+  const data = await fetchFeed(provider.url.replace(/current-status\/?$/, "incidents"));
+  const arr: any[] = Array.isArray(data) ? data : (Array.isArray(data?.incidents) ? data.incidents : []);
+  return arr.slice(0, max).map((i) => {
+    const resolved = Boolean(i?.resolved);
+    const at = Date.parse(String((resolved ? i?.resolved_at : i?.created_at) ?? i?.created_at ?? "")) || Date.now();
+    return {
+      name: String(i?.title ?? "Incident"),
+      level: "degraded",
+      at,
+      resolved,
+      url: safeUrl(i?.full_url ?? i?.href),
+    };
+  });
 }
 
 async function fetchFeed(url: string): Promise<any> {
