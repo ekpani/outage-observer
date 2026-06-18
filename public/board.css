@@ -205,6 +205,11 @@ body[data-searching="1"] .browse-cta { display: none; }
 .row .name { font-family: var(--oo-font-mono); font-size: 14px; color: var(--oo-text-primary); letter-spacing: var(--oo-tracking-mono); min-width: 140px; flex: none; }
 .row-main:hover .name { color: var(--oo-accent); }
 .row .incident { font-size: 13px; color: var(--oo-text-secondary); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* "Ongoing" note: provider is operational overall but has an open incident
+   affecting part of the service. Muted + an info glyph so it reads as context,
+   not an outage. */
+.row .incident.ongoing { color: var(--oo-text-muted); font-style: italic; }
+.row .incident.ongoing::before { content: "\24D8"; font-style: normal; margin-right: 4px; opacity: .8; }
 .row .pin { background: none; border: none; cursor: pointer; color: var(--oo-text-muted); padding: 8px; margin-right: 14px; display: grid; place-items: center; border-radius: var(--oo-radius-sm); flex: none; }
 .row .pin:hover { color: var(--oo-text-secondary); }
 .row .pin.pinned { color: var(--oo-accent); }

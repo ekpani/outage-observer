@@ -100,9 +100,13 @@ function logoTile(p) {
 
 function rowHtml(p, stack, mode) {
   const pinned = stack.has(p.id);
+  // A real current incident shows as-is; an "ongoing" note (open incident under
+  // an operational headline) shows muted, so it reads as context not an outage.
   const incident = p.incident && p.incident.name
     ? `<span class="incident" title="${esc(p.incident.name)}">${esc(p.incident.name)}</span>`
-    : '<span class="incident"></span>';
+    : p.ongoing
+      ? `<span class="incident ongoing" title="${esc(p.ongoing)}">${esc(p.ongoing)}</span>`
+      : '<span class="incident"></span>';
   // Row links to the provider's Outage Observer page (which itself links out to
   // the vendor's official status page). Internal nav, same tab.
   const href = "/status/" + encodeURIComponent(p.id);
