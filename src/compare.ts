@@ -238,6 +238,29 @@ export const COMPETITORS: Competitor[] = [
     chooseUs: "Choose Outage Observer to be notified when the services you rely on — including ones that use Statuspage — go down.",
   },
   {
+    slug: "incident-io", name: "incident.io", category: "statuspage",
+    what: "an incident-management platform with status-page hosting, used by large engineering teams",
+    site: "https://incident.io",
+    table: [
+      { label: "What it does", oo: "Watches OTHER companies' status (and alerts you)", them: "Runs YOUR incidents and publishes YOUR status page" },
+      { label: "Price", oo: "Free", them: "Paid" },
+      { label: "Account", oo: "None", them: "Required" },
+      { label: "Where alerts go", oo: ALERTS_OO, them: "On-call, Slack, your own status page subscribers" },
+    ],
+    theyAreStronger: [
+      "A full incident-management platform: on-call, response workflows, postmortems, and a hosted status page for your own service.",
+      "Used by large engineering teams to run real incidents.",
+      "Polished, modern status pages (with a Statuspage-compatible API).",
+    ],
+    weAreDifferent: [
+      "Opposite direction: we don't run your incidents or host your status — we read other companies' status pages (some of which run on incident.io) and alert you when they break.",
+      "Free, no account, nothing to set up.",
+      "Official-source-only signal with no false alarms, delivered wherever you already are.",
+    ],
+    chooseThem: "Choose incident.io to manage your own incidents and publish your own status page.",
+    chooseUs: "Choose Outage Observer to be notified when the providers you depend on — including ones whose status pages run on incident.io — go down.",
+  },
+  {
     slug: "instatus", name: "Instatus", category: "statuspage",
     what: "a fast, modern tool for hosting your own status page",
     site: "https://instatus.com",

@@ -90,7 +90,7 @@ export const CATALOG: Provider[] = [
   { id: "slack", name: "Slack", category: "Comms", adapter: "slack", url: "https://slack-status.com/api/v2.0.0/current", link: "https://slack-status.com" },
   { id: "mailgun", name: "Mailgun", category: "Comms", adapter: "statuspage", url: "https://status.mailgun.com" },
   { id: "resend", name: "Resend", category: "Comms", adapter: "statuspage", url: "https://resend-status.com" },
-  { id: "intercom", name: "Intercom", category: "Comms", adapter: "statuspage", url: "https://www.intercomstatus.com" },
+  { id: "intercom", name: "Intercom", category: "Comms", adapter: "statuspage", url: "https://www.finstatus.com", link: "https://www.finstatus.com" },
   { id: "pusher", name: "Pusher", category: "Comms", adapter: "statuspage", url: "https://status.pusher.com" },
   { id: "ably", name: "Ably", category: "Comms", adapter: "statuspage", url: "https://status.ably.com" },
   { id: "getstream", name: "Stream", category: "Comms", adapter: "statuspage", url: "https://status.getstream.io" },

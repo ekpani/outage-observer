@@ -37,6 +37,7 @@ export async function fetchRecentIncidents(provider: Provider, max = 5): Promise
     if (provider.adapter === "x") return await xIncidents(provider, max);
     if (provider.adapter === "slack") return await slackIncidents(provider, max);
     if (provider.adapter === "heroku") return await herokuIncidents(provider, max);
+    if (provider.adapter === "instatus") return await instatusIncidents(provider, max);
     return [];
   } catch {
     return [];
@@ -133,6 +134,43 @@ async function herokuIncidents(provider: Provider, max: number): Promise<Inciden
       url: safeUrl(i?.full_url ?? i?.href),
     };
   });
+}
+
+/** Instatus exposes status via summary.json but NO incident-history JSON; the
+ *  history is rendered only on the public status page (the custom domain in
+ *  summary.json's page.url), embedded as object literals like
+ *  `title:"...",status:"RESOLVED",createdAt:"...",resolvedAt:"..."`. We parse
+ *  those defensively — if Instatus ever changes the format we just return []. */
+async function instatusIncidents(provider: Provider, max: number): Promise<IncidentRecord[]> {
+  const summary = await fetchFeed(`${provider.url}/summary.json`).catch(() => null);
+  const pageUrl = String(summary?.page?.url ?? "");
+  if (!/^https:\/\//i.test(pageUrl)) return [];
+  const res = await fetch(pageUrl, {
+    headers: { "user-agent": "OutageObserver/0.1 (+https://outage.observer)" },
+    cf: { cacheTtl: 3600, cacheEverything: true },
+    signal: AbortSignal.timeout(8000),
+  });
+  if (!res.ok) return [];
+  const html = await res.text();
+  const out: IncidentRecord[] = [];
+  const seen = new Set<string>();
+  const re = /title:"((?:\\.|[^"\\])*)",status:"([A-Z]+)",createdAt:"([^"]+)"(?:,resolvedAt:(?:"([^"]+)"|null))?/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html)) !== null && out.length < max) {
+    const title = m[1].replace(/\\(.)/g, "$1").trim();
+    const status = m[2], createdAt = m[3], resolvedAt = m[4];
+    const key = `${title}|${createdAt}`;
+    if (!title || seen.has(key)) continue;
+    seen.add(key);
+    const resolved = status === "RESOLVED";
+    out.push({
+      name: title,
+      level: "degraded",
+      at: Date.parse((resolved && resolvedAt) ? resolvedAt : createdAt) || Date.now(),
+      resolved,
+    });
+  }
+  return out;
 }
 
 async function fetchFeed(url: string): Promise<any> {
