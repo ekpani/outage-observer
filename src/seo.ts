@@ -475,6 +475,7 @@ export async function renderSitemap(env: Env): Promise<string> {
     { loc: SITE + "/support", priority: "0.6", freq: "monthly" },
     { loc: SITE + "/privacy", priority: "0.3", freq: "yearly" },
     { loc: SITE + "/terms", priority: "0.3", freq: "yearly" },
+    { loc: SITE + "/subprocessors", priority: "0.2", freq: "yearly" },
     ...CATALOG.map((p) => ({ loc: `${SITE}/status/${p.id}`, priority: "0.7", freq: "hourly" })),
     ...POINTERS.map((p) => ({ loc: `${SITE}/status/${p.id}`, priority: "0.4", freq: "weekly" })),
   ];
@@ -559,6 +560,7 @@ export async function handleSeo(env: Env, url: URL): Promise<Response | null> {
   }
   if (path === "/privacy") return html(renderPrivacy());
   if (path === "/terms") return html(renderTerms());
+  if (path === "/subprocessors") return html(renderSubprocessors());
   if (path === "/about") return html(renderAbout());
   if (path === "/support") return html(renderSupport());
   if (path === "/mac") return html(renderMac());
@@ -843,6 +845,10 @@ function renderPrivacy(): string {
     <p>No accounts, no analytics, no tracking, no advertising identifiers, and no third-party SDKs loaded by default. We do not build user profiles. Like any website, our server receives standard request logs (e.g. IP address) to serve traffic and stop abuse; these are not used to identify or track you and are not sold.</p>
   </section>
   <section>
+    <h2>Sub-processors</h2>
+    <p>The service runs on Cloudflare, our infrastructure host. It is the only sub-processor that stores or processes data on our behalf. See the full <a href="/subprocessors">sub-processors list</a>.</p>
+  </section>
+  <section>
     <h2>Optional embeds</h2>
     <p>A few pages cover services that announce outages on X instead of a status feed. Those pages offer an <strong>opt-in</strong> embedded timeline that loads only if you click to load it — until then, nothing from X runs and no X cookies are set. If you do load it, that content is served by X under <a href="https://x.com/en/privacy" target="_blank" rel="noopener noreferrer">its own privacy policy</a>. There is always a plain link as an alternative.</p>
   </section>
@@ -915,6 +921,46 @@ function renderTerms(): string {
         "@type": "WebPage",
         name: "Terms of Service",
         url: SITE + "/terms",
+        isPartOf: { "@type": "WebSite", name: "Outage Observer", url: SITE + "/" },
+      },
+    ],
+    body,
+  });
+}
+
+function renderSubprocessors(): string {
+  const body = `<nav class="sp-crumbs" aria-label="Breadcrumb"><a href="/">Home</a> / <span>Sub-processors</span></nav>
+<main class="sp-main">
+  <h1>Sub-processors</h1>
+  <p class="sp-answer">Outage Observer is operated by Ekpani. We rely on a minimal set of third-party sub-processors to run the service. This page lists them and how we manage them.</p>
+  <p class="sp-meta">Last updated 18 June 2026.</p>
+  <section>
+    <h2>Our approach</h2>
+    <p>We keep sub-processors to the minimum needed to operate. Each is bound by its own data-protection terms, and we share only the data required for it to perform its function. We update this page when the list changes.</p>
+  </section>
+  <section>
+    <h2>Current sub-processors</h2>
+    <ul class="sp-related sp-stack">
+      <li><strong>Cloudflare, Inc.</strong>: hosting, edge compute, database, and network security (Cloudflare Workers, D1, and KV). Hosts all service data; the primary database region is the European Union (Western Europe). See <a href="https://www.cloudflare.com/trust-hub/" target="_blank" rel="noopener noreferrer">Cloudflare's Trust Hub</a> and its Data Processing Addendum.</li>
+    </ul>
+    <p class="sp-muted">This is the only sub-processor that stores or processes customer data. Outage Observer uses no analytics, advertising, or tracking processors.</p>
+  </section>
+  <section>
+    <h2>Changes</h2>
+    <p>Where practicable, we post material changes to this list here before they take effect. Questions: <a href="${REPO}" target="_blank" rel="noopener noreferrer">github.com/ekpani/outage-observer</a>. See also our <a href="/privacy">Privacy policy</a> and <a href="/terms">Terms</a>.</p>
+  </section>
+</main>`;
+  return shell({
+    title: "Sub-processors · Outage Observer",
+    description: "Sub-processors used by Outage Observer. Cloudflare hosts the service; no analytics, advertising, or tracking processors are used.",
+    canonical: SITE + "/subprocessors",
+    jsonld: [
+      crumbLd([{ name: "Home", path: "/" }, { name: "Sub-processors", path: "/subprocessors" }]),
+      {
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        name: "Sub-processors",
+        url: SITE + "/subprocessors",
         isPartOf: { "@type": "WebSite", name: "Outage Observer", url: SITE + "/" },
       },
     ],
