@@ -1,5 +1,6 @@
 import { CATALOG, CATEGORY_ORDER, ALIASES, type Provider } from "./catalog";
 import { POINTERS, POINTER_BY_ID, type Pointer } from "./pointers";
+import { COMPETITORS, COMPARE_BY_SLUG, OO_EDGE, type Competitor } from "./compare";
 import { LABEL } from "./labels";
 import { getBoard, getCheckedAt, getHistory, getProviderStats, type BoardEntry } from "./store";
 import { type Env } from "./telegram";
@@ -107,7 +108,7 @@ ${ld}
 </header>
 ${opts.body}
 <footer class="sp-foot">
-  <a href="/about">about</a> · <a href="/mac">mac</a> · <a href="/alerts">alerts</a> · <a href="/privacy">privacy</a> · <a href="/terms">terms</a><br/>
+  <a href="/about">about</a> · <a href="/compare">compare</a> · <a href="/mac">mac</a> · <a href="/alerts">alerts</a> · <a href="/privacy">privacy</a> · <a href="/terms">terms</a><br/>
   <a href="https://ekpani.com" target="_blank" rel="noopener noreferrer">an ekpani tool</a>
 </footer>
 </div>
@@ -479,6 +480,8 @@ export async function renderSitemap(env: Env): Promise<string> {
     { loc: SITE + "/terms", priority: "0.3", freq: "yearly" },
     { loc: SITE + "/subprocessors", priority: "0.2", freq: "yearly" },
     { loc: SITE + "/security", priority: "0.3", freq: "yearly" },
+    { loc: SITE + "/compare", priority: "0.6", freq: "monthly" },
+    ...COMPETITORS.map((c) => ({ loc: `${SITE}/compare/${c.slug}`, priority: "0.6", freq: "monthly" })),
     ...CATALOG.map((p) => ({ loc: `${SITE}/status/${p.id}`, priority: "0.7", freq: "hourly" })),
     ...POINTERS.map((p) => ({ loc: `${SITE}/status/${p.id}`, priority: "0.4", freq: "weekly" })),
   ];
@@ -565,6 +568,15 @@ export async function handleSeo(env: Env, url: URL): Promise<Response | null> {
   if (path === "/terms") return html(renderTerms());
   if (path === "/subprocessors") return html(renderSubprocessors());
   if (path === "/security") return html(renderSecurity());
+  if (path === "/compare" || path === "/compare/") return html(renderCompareHub());
+  if (path.startsWith("/compare/")) {
+    let slug: string;
+    try { slug = decodeURIComponent(path.slice("/compare/".length).replace(/\/$/, "")); }
+    catch { return new Response(notFoundPage(), { status: 404, headers: { "content-type": "text/html; charset=utf-8" } }); }
+    const c = COMPARE_BY_SLUG.get(slug);
+    if (c) return html(renderComparePage(c));
+    return new Response(notFoundPage(), { status: 404, headers: { "content-type": "text/html; charset=utf-8" } });
+  }
   if (path === "/about") return html(renderAbout());
   if (path === "/support") return html(renderSupport());
   if (path === "/mac") return html(renderMac());
@@ -603,6 +615,10 @@ function renderAbout(): string {
     <p>One small service checks each provider's official status source every minute and reacts only to real changes. Failed checks keep the last known status rather than inventing a scare, so it never cries wolf. It's free, needs no account, and stores your chosen services on your own device. The whole thing runs at the edge.</p>
   </section>
   <section>
+    <h2>How we're different</h2>
+    <p>Outage Observer is free, needs no account, and reads only providers' official status feeds, so it never invents an outage or sends a false alarm. It isn't an uptime monitor for your own site and it doesn't host your status page; it does one thing and tells you wherever you already are. See <a href="/compare">how it compares</a> to the closest tools.</p>
+  </section>
+  <section>
     <h2>Who makes it</h2>
     <p>Outage Observer is built by <a href="${EKPANI}" target="_blank" rel="noopener noreferrer">Ekpani</a>, a small studio. The source is <a href="${REPO}" target="_blank" rel="noopener noreferrer">on GitHub</a>.</p>
   </section>
@@ -611,6 +627,7 @@ function renderAbout(): string {
     <ul class="sp-related">
       <li><a href="/alerts">Get alerts</a></li>
       <li><a href="/mac">Mac app</a></li>
+      <li><a href="/compare">Compare</a></li>
       <li><a href="/support">Support &amp; FAQ</a></li>
       <li><a href="/status">All ${CATALOG.length} providers</a></li>
       <li><a href="/privacy">Privacy</a></li>
@@ -1010,6 +1027,91 @@ function renderSecurity(): string {
       },
     ],
     body,
+  });
+}
+
+// ---- /compare : how Outage Observer stacks up (honest, by approach) ----
+function renderCompareHub(): string {
+  const body = `<nav class="sp-crumbs" aria-label="Breadcrumb"><a href="/">Home</a> / <span>Compare</span></nav>
+<main class="sp-main">
+  <h1>How Outage Observer compares</h1>
+  <p class="sp-answer">Status tools do different jobs. Some monitor your own websites. Some host your status page. Outage Observer watches the official status of the ${CATALOG.length} services you depend on and tells you the moment one breaks, free, with no account.</p>
+  <section>
+    <h2>What makes Outage Observer different</h2>
+    <ul class="sp-related sp-stack">${OO_EDGE.map((e) => `<li><strong>${esc(e.title)}.</strong> ${esc(e.body)}</li>`).join("")}</ul>
+  </section>
+  <section>
+    <h2>Honest comparisons</h2>
+    <p class="sp-muted">Fair, point-in-time comparisons with the closest tools. We credit what they do better, too.</p>
+    <ul class="sp-related sp-stack">${COMPETITORS.map((c) => `<li><a href="/compare/${c.slug}"><strong>Outage Observer vs ${esc(c.name)}</strong></a> — ${esc(c.what)}.</li>`).join("")}</ul>
+  </section>
+  <section>
+    <h2>A note on other tools</h2>
+    <p>If you came looking for an alternative to an uptime monitor (which checks whether your own site is up) or a status-page host (which publishes your status), those solve a different problem. Outage Observer watches the third-party services you rely on. <a href="/about">More on how it works</a>.</p>
+  </section>
+  <section>
+    <h2>Try it</h2>
+    <p>It's free and needs no signup. <a href="/">Open the live board</a>, pick the services you depend on, and get alerts where you want them.</p>
+  </section>
+</main>`;
+  return shell({
+    title: "How Outage Observer compares · free status aggregator",
+    description: "Honest comparisons of Outage Observer with the closest status-aggregation tools. Free, no account, official status feeds only, alerts everywhere you already are.",
+    canonical: SITE + "/compare",
+    jsonld: [
+      crumbLd([{ name: "Home", path: "/" }, { name: "Compare", path: "/compare" }]),
+      { "@context": "https://schema.org", "@type": "CollectionPage", name: "How Outage Observer compares", url: SITE + "/compare", isPartOf: { "@type": "WebSite", name: "Outage Observer", url: SITE + "/" } },
+    ],
+    body,
+    image: `${SITE}/og/default.png`,
+  });
+}
+
+function renderComparePage(c: Competitor): string {
+  const canonical = `${SITE}/compare/${c.slug}`;
+  const rows = c.table.map((r) => `<tr><th scope="row">${esc(r.label)}</th><td>${esc(r.oo)}</td><td>${esc(r.them)}</td></tr>`).join("");
+  const body = `<nav class="sp-crumbs" aria-label="Breadcrumb"><a href="/">Home</a> / <a href="/compare">Compare</a> / <span>${esc(c.name)}</span></nav>
+<main class="sp-main">
+  <h1>Outage Observer vs ${esc(c.name)}</h1>
+  <p class="sp-answer">${esc(c.name)} is ${esc(c.what)}. Outage Observer is a free, no-account status board and alerts for the services you depend on. Here's an honest comparison.</p>
+  <p class="sp-meta">Reviewed 18 June 2026 · <a href="${esc(c.site)}" target="_blank" rel="noopener nofollow">${esc(c.name)} →</a></p>
+  <section>
+    <h2>At a glance</h2>
+    <table class="cmp"><thead><tr><td></td><th scope="col">Outage Observer</th><th scope="col">${esc(c.name)}</th></tr></thead><tbody>${rows}</tbody></table>
+  </section>
+  <section>
+    <h2>Where ${esc(c.name)} is stronger</h2>
+    <ul class="sp-related sp-stack">${c.theyAreStronger.map((s) => `<li>${esc(s)}</li>`).join("")}</ul>
+  </section>
+  <section>
+    <h2>Where Outage Observer is different</h2>
+    <ul class="sp-related sp-stack">${c.weAreDifferent.map((s) => `<li>${esc(s)}</li>`).join("")}</ul>
+  </section>
+  <section>
+    <h2>Which should you use?</h2>
+    <p>${esc(c.chooseThem)}</p>
+    <p>${esc(c.chooseUs)}</p>
+  </section>
+  <section>
+    <h2>Try Outage Observer</h2>
+    <p>Free, no signup. <a href="/">Open the board</a>, or see <a href="/compare">all comparisons</a>.</p>
+  </section>
+</main>`;
+  const faq = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: [
+      { "@type": "Question", name: `Is Outage Observer a free ${c.name} alternative?`, acceptedAnswer: { "@type": "Answer", text: `Outage Observer is a free, no-account status board and alerts for the services you depend on. ${c.name} is ${c.what}, a paid product that requires an account. ${c.chooseUs}` } },
+      { "@type": "Question", name: `What is the difference between Outage Observer and ${c.name}?`, acceptedAnswer: { "@type": "Answer", text: c.weAreDifferent.join(" ") } },
+    ],
+  };
+  return shell({
+    title: `Outage Observer vs ${c.name} — a free, no-account alternative`,
+    description: `Outage Observer vs ${c.name}: a free, no-signup status board with official-source-only alerts and no false alarms. An honest comparison, including where ${c.name} is stronger.`,
+    canonical,
+    jsonld: [crumbLd([{ name: "Home", path: "/" }, { name: "Compare", path: "/compare" }, { name: c.name, path: `/compare/${c.slug}` }]), faq],
+    body,
+    image: `${SITE}/og/default.png`,
   });
 }
 

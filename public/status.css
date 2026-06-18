@@ -115,6 +115,16 @@ a.inc-name:hover { color: var(--oo-accent); }
 .sp-related.sp-stack li { display: list-item; list-style: none; margin: 0 0 10px; padding-left: 0; color: var(--oo-text-secondary); }
 .sp-related.sp-stack li strong { color: var(--oo-text-primary); }
 
+/* At-a-glance comparison table on /compare/<x> */
+.cmp { width: 100%; border-collapse: collapse; margin-top: var(--oo-space-4); font-size: var(--oo-text-sm); }
+.cmp th, .cmp td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--oo-border); vertical-align: top; }
+.cmp thead th { font-weight: var(--oo-weight-semibold); color: var(--oo-text-primary); }
+.cmp thead th:nth-child(2) { color: var(--oo-accent); }
+.cmp tbody th { color: var(--oo-text-muted); font-family: var(--oo-font-mono); font-size: var(--oo-text-xs); letter-spacing: var(--oo-tracking-mono); font-weight: var(--oo-weight-regular); white-space: nowrap; }
+.cmp tbody td { color: var(--oo-text-secondary); }
+.cmp tbody td:first-of-type { color: var(--oo-text-primary); }
+@media (max-width: 560px) { .cmp { display: block; overflow-x: auto; white-space: nowrap; } .cmp td, .cmp th { white-space: normal; min-width: 120px; } }
+
 /* ---- Mac popover mockup (faithful recreation, not a screenshot) ---- */
 .mac-mock {
   width: 320px; max-width: 100%; margin: 28px 0 8px;
