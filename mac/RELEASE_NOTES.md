@@ -1,4 +1,4 @@
-## What's new in 1.3.1
+## What's new in 1.3.2
 
-- **More services, and the list now updates itself.** Added Tailscale plus social, gaming, finance, and everyday-consumer platforms. From now on, services we add show up in the picker automatically, with no app update needed.
+- **Renamed services now follow you.** When a provider is renamed (for example Anthropic → Claude), the one you're watching updates automatically, with no stale or duplicate rows to clean up.
 - Reliability and polish under the hood.
