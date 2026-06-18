@@ -4,7 +4,8 @@
 // token (stored as a "slack-bot" target keyed on the channel id).
 import { type Env } from "./telegram";
 import { statusText, listText, resolveMany, displayName, HELP } from "./botcommands";
-import { upsertTarget, setTargetSubs, getTargetByChannelAddress, getTargetSubs, deleteTargetByChannelAddress, setSlackTeam } from "./store";
+import { upsertTarget, setTargetSubs, getTargetByChannelAddress, getTargetSubs, deleteTargetByChannelAddress, setSlackTeam, getSlackToken } from "./store";
+import { deliver, type AlertEvent } from "./channels";
 import { renderNotice } from "./seo";
 
 const CH = "slack-bot";
@@ -63,6 +64,25 @@ export async function handleSlackCommand(env: Env, request: Request): Promise<Re
     const merged = [...new Set([...await getTargetSubs(env, id), ...ids])];
     await setTargetSubs(env, id, merged);
     return reply(`Now watching ${ids.map(displayName).join(", ")} in this channel. (${merged.length} total) If alerts don't appear, run \`/invite @Outage Observer\` here.`, true);
+  }
+  if (cmd === "test") {
+    // Post a clearly-labelled sample alert through the real delivery path, so
+    // anyone (including reviewers) can see the format and confirm the bot can
+    // post here, without waiting for a real provider transition.
+    const token = await getSlackToken(env, teamId);
+    const sample: AlertEvent = {
+      id: "stripe",
+      name: "Stripe (test)",
+      level: "partial_outage",
+      from: "operational",
+      url: "https://outage.observer/status/stripe",
+      incident: "Sample alert. Real alerts arrive automatically when a provider you watch changes state.",
+      regions: [],
+    };
+    const res = await deliver(env, { channel: CH, address: channelId, meta: JSON.stringify({ team: teamId }), token }, sample);
+    return reply(res === "ok"
+      ? "Posted a test alert to this channel. Real alerts look like that and arrive automatically when a provider you watch changes state."
+      : "Couldn't post here. If this is a private channel, run `/invite @Outage Observer` first, then try again.");
   }
   return reply(HELP);
 }

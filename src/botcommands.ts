@@ -61,4 +61,4 @@ export async function listText(env: Env, channel: string, address: string): Prom
   return `Watching here: ${subs.map(displayName).join(", ")}`;
 }
 
-export const HELP = "Commands: `/outage status <service>`, `/outage watch <services>`, `/outage list`, `/outage stop`.";
+export const HELP = "Commands: `/outage status <service>`, `/outage watch <services>`, `/outage list`, `/outage stop`, `/outage test`.";
