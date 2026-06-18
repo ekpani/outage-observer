@@ -121,6 +121,19 @@ export default {
       });
     }
 
+    // Published security contact + disclosure policy (RFC 9116).
+    if (request.method === "GET" && (url.pathname === "/.well-known/security.txt" || url.pathname === "/security.txt")) {
+      const txt = [
+        "Contact: mailto:hi@ekpani.com",
+        "Policy: https://github.com/ekpani/outage-observer/blob/main/SECURITY.md",
+        "Expires: 2027-06-18T00:00:00.000Z",
+        "Preferred-Languages: en",
+        "Canonical: https://outage.observer/.well-known/security.txt",
+        "",
+      ].join("\n");
+      return new Response(txt, { headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "public, max-age=86400" } });
+    }
+
     // SEO / AEO surfaces: server-rendered provider pages, the directory,
     // sitemap, and llms.txt. Edge-cached so crawlers don't hit KV/D1 each time.
     if (request.method === "GET" && (url.pathname === "/status" || url.pathname.startsWith("/status/") || url.pathname === "/sitemap.xml" || url.pathname === "/llms.txt" || ["/privacy", "/terms", "/subprocessors", "/about", "/support", "/mac", "/alerts"].includes(url.pathname))) {
