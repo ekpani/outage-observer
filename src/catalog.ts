@@ -1,4 +1,4 @@
-export type Adapter = "statuspage" | "instatus" | "slack" | "heroku" | "gcp" | "aws" | "azure" | "x";
+export type Adapter = "statuspage" | "instatus" | "statusio" | "slack" | "heroku" | "gcp" | "aws" | "azure" | "x";
 
 export interface Provider {
   id: string;
@@ -188,7 +188,7 @@ export const CATALOG: Provider[] = [
   // Widely-used services we were missing (probed live).
   { id: "postman", name: "Postman", category: "Dev & CI", adapter: "statuspage", url: "https://status.postman.com" },
   { id: "pypi", name: "PyPI", category: "Dev & CI", adapter: "statuspage", url: "https://status.python.org" },
-  { id: "neon", name: "Neon", category: "Data & backend", adapter: "instatus", url: "https://neon.instatus.com" },
+  { id: "neon", name: "Neon", category: "Data & backend", adapter: "statusio", url: "https://api.status.io/1.0/status/6878fc85709daa75be6c7e3c", link: "https://neonstatus.com" },
   { id: "hubspot", name: "HubSpot", category: "Collaboration", adapter: "statuspage", url: "https://status.hubspot.com" },
   { id: "docusign", name: "DocuSign", category: "Collaboration", adapter: "statuspage", url: "https://status.docusign.com" },
   { id: "box", name: "Box", category: "Collaboration", adapter: "statuspage", url: "https://status.box.com" },

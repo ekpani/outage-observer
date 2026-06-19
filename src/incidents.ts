@@ -26,10 +26,11 @@ const GCP_LEVEL: Record<string, string> = {
 };
 
 /** Recent incidents (resolved + ongoing) from a provider's published history.
- *  Statuspage and Google Cloud both expose a clean incident feed; other custom
- *  adapters (Instatus, AWS, Azure, etc.) don't yet, so they return [] and the
- *  page falls back to our recorded transitions. Edge-cached for an hour, so this
- *  costs ~one shared subrequest regardless of page traffic. */
+ *  Statuspage, Google Cloud, Slack, Heroku and Instatus all expose a clean,
+ *  structured history feed; the remaining adapters (AWS, Azure, etc.) don't yet,
+ *  so they return [] and the page falls back to our recorded transitions.
+ *  Edge-cached for an hour, so this costs ~one shared subrequest regardless of
+ *  page traffic. */
 export async function fetchRecentIncidents(provider: Provider, max = 5): Promise<IncidentRecord[]> {
   try {
     if (provider.adapter === "statuspage") return await statuspageIncidents(provider, max);
@@ -38,6 +39,7 @@ export async function fetchRecentIncidents(provider: Provider, max = 5): Promise
     if (provider.adapter === "slack") return await slackIncidents(provider, max);
     if (provider.adapter === "heroku") return await herokuIncidents(provider, max);
     if (provider.adapter === "instatus") return await instatusIncidents(provider, max);
+    if (provider.adapter === "statusio") return await statusioIncidents(provider, max);
     return [];
   } catch {
     return [];
@@ -136,41 +138,101 @@ async function herokuIncidents(provider: Provider, max: number): Promise<Inciden
   });
 }
 
-/** Instatus exposes status via summary.json but NO incident-history JSON; the
- *  history is rendered only on the public status page (the custom domain in
- *  summary.json's page.url), embedded as object literals like
- *  `title:"...",status:"RESOLVED",createdAt:"...",resolvedAt:"..."`. We parse
- *  those defensively — if Instatus ever changes the format we just return []. */
+/** Instatus' summary.json carries only the current status (no incident
+ *  history), and the status page itself is a Next.js RSC payload that's
+ *  fragile to scrape. But every Instatus page also publishes a clean,
+ *  structured Atom incident-history feed at `${origin}/history.atom` — that's
+ *  the authoritative, stable source, so we parse that. Each <entry> is one
+ *  incident: <title> is the name, <published> the start time, and the CDATA
+ *  <content> carries the update timeline (a "Resolved"/"Completed" line means
+ *  it's closed). If the feed is ever missing or malformed we just return []. */
 async function instatusIncidents(provider: Provider, max: number): Promise<IncidentRecord[]> {
-  const summary = await fetchFeed(`${provider.url}/summary.json`).catch(() => null);
-  const pageUrl = String(summary?.page?.url ?? "");
-  if (!/^https:\/\//i.test(pageUrl)) return [];
-  const res = await fetch(pageUrl, {
-    headers: { "user-agent": "OutageObserver/0.1 (+https://outage.observer)" },
+  const res = await fetch(`${provider.url}/history.atom`, {
+    headers: {
+      "user-agent": "OutageObserver/0.1 (+https://outage.observer)",
+      accept: "application/atom+xml",
+    },
     cf: { cacheTtl: 3600, cacheEverything: true },
     signal: AbortSignal.timeout(8000),
   });
   if (!res.ok) return [];
-  const html = await res.text();
+  const xml = await res.text();
   const out: IncidentRecord[] = [];
-  const seen = new Set<string>();
-  const re = /title:"((?:\\.|[^"\\])*)",status:"([A-Z]+)",createdAt:"([^"]+)"(?:,resolvedAt:(?:"([^"]+)"|null))?/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(html)) !== null && out.length < max) {
-    const title = m[1].replace(/\\(.)/g, "$1").trim();
-    const status = m[2], createdAt = m[3], resolvedAt = m[4];
-    const key = `${title}|${createdAt}`;
-    if (!title || seen.has(key)) continue;
-    seen.add(key);
-    const resolved = status === "RESOLVED";
+  for (const e of xml.matchAll(/<entry>([\s\S]*?)<\/entry>/g)) {
+    const body = e[1];
+    const title = decodeXml((/<title>([\s\S]*?)<\/title>/.exec(body)?.[1] ?? "").trim());
+    if (!title) continue;
+    const published = /<published>([^<]+)<\/published>/.exec(body)?.[1] ?? "";
+    const content = /<content[^>]*>([\s\S]*?)<\/content>/.exec(body)?.[1] ?? "";
+    const isMaintenance = /<strong>\s*Type:\s*<\/strong>\s*Maintenance/i.test(content);
+    const resolved = /<strong>\s*(?:Resolved|Completed)\s*<\/strong>/i.test(content);
     out.push({
       name: title,
-      level: "degraded",
-      at: Date.parse((resolved && resolvedAt) ? resolvedAt : createdAt) || Date.now(),
+      level: isMaintenance ? "maintenance" : "degraded",
+      at: Date.parse(published) || Date.now(),
       resolved,
     });
+    if (out.length >= max) break;
   }
   return out;
+}
+
+/** Status.io publishes an incident-history RSS feed at
+ *  https://status.io/pages/<pageId>/rss. The catalog url is the API status
+ *  endpoint (.../1.0/status/<pageId>), so we reuse that id for the feed. Each
+ *  <item> is one incident: <title> is the name, <pubDate> the latest update
+ *  time, and the CDATA <description> carries the state timeline (a
+ *  "Resolved"/"Completed" line means it's closed). */
+async function statusioIncidents(provider: Provider, max: number): Promise<IncidentRecord[]> {
+  const id = /\/status\/([a-z0-9]+)/i.exec(provider.url)?.[1];
+  if (!id) return [];
+  const res = await fetch(`https://status.io/pages/${id}/rss`, {
+    headers: {
+      "user-agent": "OutageObserver/0.1 (+https://outage.observer)",
+      accept: "application/rss+xml",
+    },
+    cf: { cacheTtl: 3600, cacheEverything: true },
+    signal: AbortSignal.timeout(8000),
+  });
+  if (!res.ok) return [];
+  const xml = await res.text();
+  const out: IncidentRecord[] = [];
+  for (const it of xml.matchAll(/<item>([\s\S]*?)<\/item>/g)) {
+    const body = it[1];
+    const title = decodeXml(stripCdata((/<title>([\s\S]*?)<\/title>/.exec(body)?.[1] ?? "")).trim());
+    if (!title) continue;
+    const desc = stripCdata(/<description>([\s\S]*?)<\/description>/.exec(body)?.[1] ?? "");
+    const pub = /<pubDate>([^<]+)<\/pubDate>/.exec(body)?.[1] ?? "";
+    const maintenance = /<b>\s*Completed\s*<\/b>/i.test(desc) || /scheduled maintenance/i.test(title);
+    const resolved = /<b>\s*(?:Resolved|Completed)\s*<\/b>/i.test(desc);
+    out.push({
+      name: title,
+      level: maintenance ? "maintenance" : "degraded",
+      at: Date.parse(pub) || Date.now(),
+      resolved,
+    });
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
+// Unwrap a CDATA section if present, else return the string unchanged.
+function stripCdata(s: string): string {
+  const m = /^\s*<!\[CDATA\[([\s\S]*?)\]\]>\s*$/.exec(s);
+  return m ? m[1] : s;
+}
+
+// Minimal XML entity decode for feed text (titles). The five predefined
+// entities plus numeric refs cover everything Instatus emits.
+function decodeXml(s: string): string {
+  return s.replace(/&(#x?[0-9a-fA-F]+|amp|lt|gt|quot|apos);/g, (_, ent) => {
+    if (ent[0] === "#") {
+      const code = ent[1] === "x" || ent[1] === "X" ? parseInt(ent.slice(2), 16) : parseInt(ent.slice(1), 10);
+      return Number.isFinite(code) ? String.fromCodePoint(code) : _;
+    }
+    const named: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" };
+    return named[ent] ?? _;
+  });
 }
 
 async function fetchFeed(url: string): Promise<any> {
