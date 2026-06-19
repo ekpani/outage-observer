@@ -34,14 +34,15 @@ function toEntry(provider: Provider, status: ProviderStatus): BoardEntry {
   return entry;
 }
 
-// Free tier allows 50 subrequests per invocation (KV/D1/fetch all count). Each
-// tick polls the 16 priority providers (every minute) plus one rotating shard of
-// the rest, so fetches stay bounded as the catalog grows. Worst-case budget for
-// one tick: 16 priority + ~10 shard fetches (26) + board/state/fan-out KV+D1
-// (~10) + drains (drainOutbox 6 -> 8, drainTargetOutbox 4 -> 6) = ~50, and the
-// drains are guarded (see applyResults) so a rare overrun can never discard the
-// already-committed transitions or stall checkedAt — undrained rows just flush
-// next tick. Keep this sum under 50 when changing the shard or drain budgets.
+// Free-tier subrequest budget (since 2026-02-11): 50 EXTERNAL fetches + 1000
+// calls to Cloudflare services (KV/D1/DO/Cache) per invocation — two separate
+// pools. So only outbound fetches compete here; the board/state/fan-out KV+D1
+// work draws from the roomy 1000 pool and no longer counts against polling.
+// Each tick makes 16 priority + ~10 shard = ~26 external poll fetches, leaving
+// ~24 external for notification sends. Drains (see applyResults) take ~20 of
+// that with margin, and are guarded so a rare overrun can never discard the
+// already-committed transitions or stall checkedAt — undrained rows flush next
+// tick. Keep (26 poll + drain sends) under 50 when changing the shard/drains.
 const REST_SHARD_TARGET = 10;
 
 /** Poll the priority set plus one shard of the remaining catalog. `nowMs`
@@ -129,21 +130,19 @@ export async function applyResults(
   //    its headline green during a contained incident). Commit the state above,
   //    just don't alert "recovered" for it.
   const alertable = confirmed.filter((c) => !(c.to === "operational" && c.status.incidents.length > 0));
-  const didFanOut = alertable.length > 0;
-  if (didFanOut) await fanOut(env, alertable);
+  if (alertable.length) await fanOut(env, alertable);
 
-  // 6) Drain bounded batches every tick so any backlog flushes over subsequent
-  //    ticks. Guarded: the essential work above (state CAS, board, enqueue) is
-  //    already committed, so if delivery ever hits the subrequest ceiling during
-  //    a heavy incident we swallow it and let the remaining rows flush next tick
-  //    rather than throwing away this tick's confirmed transitions.
-  //    Adaptive: a tick that fanned out already spent ~5 subrequests on the
-  //    fan-out lookups/enqueues, so it drains conservatively; a quiet tick has
-  //    that headroom free, so it drains more to clear any backlog faster. Both
-  //    stay under the 50-subrequest free-tier ceiling (drain costs 2 + N each).
+  // 6) Drain queued deliveries each tick so any backlog flushes over subsequent
+  //    ticks. The fan-out above is pure D1 (the 1000-call Cloudflare-services
+  //    pool), so it doesn't compete with these sends for the 50 external-fetch
+  //    pool — only the ~26 poll fetches do. That leaves comfortable room for
+  //    ~20 sends/tick (each one external fetch): ~12 Telegram + ~8 push/Slack/
+  //    Discord, i.e. up to ~1,200 alerts/hour on the cron path alone. Guarded so
+  //    a delivery hiccup defers the rest to the next tick rather than discarding
+  //    this tick's already-committed transitions.
   try {
-    await drainOutbox(env, didFanOut ? 6 : 9);
-    await drainTargetOutbox(env, didFanOut ? 4 : 5);
+    await drainOutbox(env, 12);
+    await drainTargetOutbox(env, 8);
   } catch (err) {
     console.warn("drain deferred to next tick", String(err));
   }
