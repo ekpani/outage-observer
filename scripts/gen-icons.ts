@@ -30,6 +30,9 @@ const SLUGS: Record<string, string> = {
 // Brand-domain overrides for favicon lookup where the heuristic guesses wrong.
 const DOMAINS: Record<string, string> = {
   aws: "aws.amazon.com",
+  // Bugsnag's status page lives under smartbear.com now, but the brand icon
+  // must stay Bugsnag's, not SmartBear's.
+  bugsnag: "bugsnag.com",
 };
 
 // Index every Simple Icon by its slug.

@@ -40,6 +40,7 @@ export async function fetchRecentIncidents(provider: Provider, max = 5): Promise
     if (provider.adapter === "heroku") return await herokuIncidents(provider, max);
     if (provider.adapter === "instatus") return await instatusIncidents(provider, max);
     if (provider.adapter === "statusio") return await statusioIncidents(provider, max);
+    if (provider.adapter === "onlineornot") return await onlineOrNotIncidents(provider, max);
     return [];
   } catch {
     return [];
@@ -205,6 +206,40 @@ async function statusioIncidents(provider: Provider, max: number): Promise<Incid
     const pub = /<pubDate>([^<]+)<\/pubDate>/.exec(body)?.[1] ?? "";
     const maintenance = /<b>\s*Completed\s*<\/b>/i.test(desc) || /scheduled maintenance/i.test(title);
     const resolved = /<b>\s*(?:Resolved|Completed)\s*<\/b>/i.test(desc);
+    out.push({
+      name: title,
+      level: maintenance ? "maintenance" : "degraded",
+      at: Date.parse(pub) || Date.now(),
+      resolved,
+    });
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
+/** OnlineOrNot status pages publish an incident-history RSS feed at
+ *  ${base}/incidents.rss. Each <item> is one incident; the CDATA description
+ *  carries the state ("RESOLVED"/"COMPLETED" means it's closed). */
+async function onlineOrNotIncidents(provider: Provider, max: number): Promise<IncidentRecord[]> {
+  const res = await fetch(`${provider.url}/incidents.rss`, {
+    headers: {
+      "user-agent": "OutageObserver/0.1 (+https://outage.observer)",
+      accept: "application/rss+xml",
+    },
+    cf: { cacheTtl: 3600, cacheEverything: true },
+    signal: AbortSignal.timeout(8000),
+  });
+  if (!res.ok) return [];
+  const xml = await res.text();
+  const out: IncidentRecord[] = [];
+  for (const it of xml.matchAll(/<item>([\s\S]*?)<\/item>/g)) {
+    const body = it[1];
+    const title = decodeXml(stripCdata((/<title>([\s\S]*?)<\/title>/.exec(body)?.[1] ?? "")).trim());
+    if (!title) continue;
+    const desc = stripCdata(/<description>([\s\S]*?)<\/description>/.exec(body)?.[1] ?? "");
+    const pub = /<pubDate>([^<]+)<\/pubDate>/.exec(body)?.[1] ?? "";
+    const maintenance = /<strong>\s*COMPLETED\s*<\/strong>/i.test(desc) || /maintenance/i.test(title);
+    const resolved = /<strong>\s*(?:RESOLVED|COMPLETED)\s*<\/strong>/i.test(desc);
     out.push({
       name: title,
       level: maintenance ? "maintenance" : "degraded",

@@ -1,4 +1,4 @@
-export type Adapter = "statuspage" | "instatus" | "statusio" | "slack" | "heroku" | "gcp" | "aws" | "azure" | "x";
+export type Adapter = "statuspage" | "instatus" | "statusio" | "onlineornot" | "slack" | "heroku" | "gcp" | "aws" | "azure" | "x";
 
 export interface Provider {
   id: string;
@@ -54,9 +54,9 @@ export const CATALOG: Provider[] = [
   { id: "jfrog", name: "JFrog", category: "Dev & CI", adapter: "statuspage", url: "https://status.jfrog.io" },
   { id: "snyk", name: "Snyk", category: "Dev & CI", adapter: "statuspage", url: "https://status.snyk.io" },
   { id: "expo", name: "Expo", category: "Dev & CI", adapter: "statuspage", url: "https://status.expo.dev" },
-  { id: "gitpod", name: "Gitpod", category: "Dev & CI", adapter: "statuspage", url: "https://www.gitpodstatus.com" },
+  { id: "gitpod", name: "Gitpod", category: "Dev & CI", adapter: "statuspage", url: "https://onastatus.com", link: "https://onastatus.com" },
   { id: "pulumi", name: "Pulumi", category: "Dev & CI", adapter: "statuspage", url: "https://status.pulumi.com" },
-  { id: "codecov", name: "Codecov", category: "Dev & CI", adapter: "statuspage", url: "https://status.codecov.io" },
+  { id: "codecov", name: "Codecov", category: "Dev & CI", adapter: "statuspage", url: "https://status.codecov.com" },
   { id: "sentry", name: "Sentry", category: "Dev & CI", adapter: "statuspage", url: "https://status.sentry.io" },
 
   // Data & backend
@@ -86,7 +86,7 @@ export const CATALOG: Provider[] = [
   { id: "twilio", name: "Twilio", category: "Comms", adapter: "statuspage", url: "https://status.twilio.com" },
   { id: "sendgrid", name: "SendGrid", category: "Comms", adapter: "statuspage", url: "https://status.sendgrid.com" },
   { id: "discord", name: "Discord", category: "Social & community", adapter: "statuspage", url: "https://discordstatus.com" },
-  { id: "zoom", name: "Zoom", category: "Comms", adapter: "statuspage", url: "https://status.zoom.us" },
+  { id: "zoom", name: "Zoom", category: "Comms", adapter: "statuspage", url: "https://www.zoomstatus.com" },
   { id: "slack", name: "Slack", category: "Comms", adapter: "slack", url: "https://slack-status.com/api/v2.0.0/current", link: "https://slack-status.com" },
   { id: "mailgun", name: "Mailgun", category: "Comms", adapter: "statuspage", url: "https://status.mailgun.com" },
   { id: "resend", name: "Resend", category: "Comms", adapter: "statuspage", url: "https://resend-status.com" },
@@ -110,6 +110,7 @@ export const CATALOG: Provider[] = [
   { id: "groq", name: "Groq", category: "AI & model providers", adapter: "statuspage", url: "https://groqstatus.com" },
   { id: "elevenlabs", name: "ElevenLabs", category: "AI & model providers", adapter: "statuspage", url: "https://status.elevenlabs.io" },
   { id: "perplexity", name: "Perplexity", category: "AI & model providers", adapter: "instatus", url: "https://status.perplexity.com" },
+  { id: "openrouter", name: "OpenRouter", category: "AI & model providers", adapter: "onlineornot", url: "https://status.openrouter.ai" },
   { id: "deepgram", name: "Deepgram", category: "AI & model providers", adapter: "statuspage", url: "https://status.deepgram.com" },
   { id: "assemblyai", name: "AssemblyAI", category: "AI & model providers", adapter: "statuspage", url: "https://status.assemblyai.com" },
   { id: "langsmith", name: "LangSmith", category: "AI & model providers", adapter: "statuspage", url: "https://status.smith.langchain.com" },
@@ -141,7 +142,7 @@ export const CATALOG: Provider[] = [
   { id: "grafana", name: "Grafana Cloud", category: "Monitoring", adapter: "statuspage", url: "https://status.grafana.com" },
   { id: "newrelic", name: "New Relic", category: "Monitoring", adapter: "statuspage", url: "https://status.newrelic.com" },
   { id: "honeycomb", name: "Honeycomb", category: "Monitoring", adapter: "statuspage", url: "https://status.honeycomb.io" },
-  { id: "bugsnag", name: "Bugsnag", category: "Monitoring", adapter: "statuspage", url: "https://status.bugsnag.com" },
+  { id: "bugsnag", name: "Bugsnag", category: "Monitoring", adapter: "statuspage", url: "https://bugsnag.status.smartbear.com", link: "https://bugsnag.status.smartbear.com" },
   { id: "rollbar", name: "Rollbar", category: "Monitoring", adapter: "statuspage", url: "https://status.rollbar.com" },
   { id: "launchdarkly", name: "LaunchDarkly", category: "Monitoring", adapter: "statuspage", url: "https://status.launchdarkly.com" },
   { id: "1password", name: "1Password", category: "Monitoring", adapter: "statuspage", url: "https://status.1password.com" },
@@ -149,7 +150,7 @@ export const CATALOG: Provider[] = [
   // Commerce & CMS
   { id: "shopify", name: "Shopify", category: "Commerce & CMS", adapter: "statuspage", url: "https://www.shopifystatus.com" },
   { id: "contentful", name: "Contentful", category: "Commerce & CMS", adapter: "statuspage", url: "https://www.contentfulstatus.com" },
-  { id: "sanity", name: "Sanity", category: "Commerce & CMS", adapter: "statuspage", url: "https://status.sanity.io" },
+  { id: "sanity", name: "Sanity", category: "Commerce & CMS", adapter: "statuspage", url: "https://www.sanity-status.com" },
 
   // Analytics
   { id: "amplitude", name: "Amplitude", category: "Analytics", adapter: "statuspage", url: "https://status.amplitude.com" },
@@ -162,13 +163,13 @@ export const CATALOG: Provider[] = [
   // Social & community
   { id: "reddit", name: "Reddit", category: "Social & community", adapter: "statuspage", url: "https://www.redditstatus.com" },
   { id: "x", name: "X (Twitter)", category: "Social & community", adapter: "x", url: "https://docs.x.com/status.md", link: "https://docs.x.com/status" },
-  { id: "pinterest", name: "Pinterest", category: "Social & community", adapter: "statuspage", url: "https://status.pinterest.com" },
+  { id: "pinterest", name: "Pinterest", category: "Social & community", adapter: "statuspage", url: "https://www.pintereststatus.com" },
   { id: "medium", name: "Medium", category: "Social & community", adapter: "statuspage", url: "https://medium.statuspage.io" },
   { id: "wikimedia", name: "Wikimedia", category: "Social & community", adapter: "statuspage", url: "https://www.wikimediastatus.net" },
   { id: "patreon", name: "Patreon", category: "Social & community", adapter: "statuspage", url: "https://status.patreon.com" },
 
   // Gaming & streaming
-  { id: "twitch", name: "Twitch", category: "Gaming & streaming", adapter: "statuspage", url: "https://status.twitch.tv" },
+  { id: "twitch", name: "Twitch", category: "Gaming & streaming", adapter: "statuspage", url: "https://status.twitch.com" },
   { id: "epicgames", name: "Epic Games", category: "Gaming & streaming", adapter: "statuspage", url: "https://status.epicgames.com" },
 
   // Finance & crypto
