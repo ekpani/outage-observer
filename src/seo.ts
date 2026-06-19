@@ -837,6 +837,14 @@ function renderAlerts(): string {
     <p class="sp-muted">Chrome, Edge, Firefox, and Safari (on iPhone, add the board to your Home Screen first).</p>
   </section>
   <section>
+    <h2>🖥 Mac app</h2>
+    <p>A native menu-bar app with notifications and a status reticle. <a href="/mac">Get the Mac app →</a></p>
+  </section>
+  <section>
+    <h2>💬 Telegram</h2>
+    <p>Message <a href="https://t.me/outageobserverbot" target="_blank" rel="noopener noreferrer">@outageobserverbot</a>, search and pick your services, and it pings you on every change. Commands: <span class="mono">/start</span>, <span class="mono">/status</span>, <span class="mono">/stop</span>.</p>
+  </section>
+  <section>
     <h2>🧩 Slack &amp; Discord</h2>
     <p>Post changes into a channel. Create an incoming webhook for the channel, then paste its URL:</p>
     <div class="al-row">
@@ -844,14 +852,6 @@ function renderAlerts(): string {
       <button class="btn-accent" id="al-hook-btn">Connect</button>
     </div>
     <span class="al-hint" id="al-hook-state"></span>
-  </section>
-  <section>
-    <h2>🖥 Mac app</h2>
-    <p>A native menu-bar app with notifications and a status reticle. <a href="/mac">Get the Mac app →</a></p>
-  </section>
-  <section>
-    <h2>💬 Telegram</h2>
-    <p>Message <a href="https://t.me/outageobserverbot" target="_blank" rel="noopener noreferrer">@outageobserverbot</a>, search and pick your services, and it pings you on every change. Commands: <span class="mono">/start</span>, <span class="mono">/status</span>, <span class="mono">/stop</span>.</p>
   </section>
   <section>
     <h2>📡 RSS / Atom</h2>
@@ -869,7 +869,7 @@ function renderAlerts(): string {
 </main>`;
   return shell({
     title: "Get alerts · Outage Observer",
-    description: "Set up notifications when a service you depend on changes state: browser push, Slack/Discord webhooks, the Mac app, Telegram, and RSS/Atom feeds. Free, no account.",
+    description: "Set up notifications when a service you depend on changes state: browser push, the Mac app, Telegram, Slack/Discord webhooks, and RSS/Atom feeds. Free, no account.",
     canonical: SITE + "/alerts",
     jsonld: [
       crumbLd([{ name: "Home", path: "/" }, { name: "Alerts", path: "/alerts" }]),
