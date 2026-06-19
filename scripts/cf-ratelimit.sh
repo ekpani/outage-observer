@@ -7,11 +7,13 @@
 #   - bot webhook paths (/webhook, /slack, /discord, /ingest) — these arrive
 #     from a few Telegram/Slack/Discord IPs at high volume; rate-limiting them
 #     would break the bots.
-#   - verified bots (Googlebot, Bingbot, etc.) — never challenge real crawlers,
+#   - verified bots (Googlebot, Bingbot, etc.) — never block real crawlers,
 #     so SEO/AEO indexing is untouched.
 #
-# Managed Challenge is invisible-to-low-friction for real browsers and stops
-# headless scrapers. THRESHOLD is generous on purpose ("seamless for humans").
+# The Free plan only allows the "block" action for rate limiting (challenge
+# actions are paid), and only a 10s window / 10s mitigation. THRESHOLD is set
+# generously so real users (who mostly hit cached pages) never reach it; a flood
+# gets a short 10s block that auto-clears.
 #
 # Run:  CLOUDFLARE_API_TOKEN=<token with Zone:WAF Edit + Zone:Read> \
 #         bash scripts/cf-ratelimit.sh
@@ -40,9 +42,9 @@ print(json.dumps({
   "rules": [{
     "description": "Per-IP flood guard (skip bot webhooks + verified crawlers)",
     "expression": expr,
-    "action": "managed_challenge",
+    "action": "block",
     "ratelimit": {
-      "characteristics": ["ip.src"],
+      "characteristics": ["cf.colo.id", "ip.src"],
       "period": 10,
       "requests_per_period": threshold,
       "mitigation_timeout": 10
