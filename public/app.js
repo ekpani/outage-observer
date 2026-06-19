@@ -10,6 +10,60 @@ const CATEGORY_ORDER = [
   "Social & community", "Gaming & streaming", "Finance & crypto", "Consumer & lifestyle",
 ];
 
+// ---- Turnstile (invisible bot check on the write actions) -------------------
+// Dormant unless the Worker reports a site key. Managed/interaction-only mode:
+// real people get a token with no clicks; suspicious clients see a quick check.
+// tsToken() always resolves (never rejects) so a hiccup can't block a sign-up —
+// the server is the real gate and treats a missing token as "verify failed"
+// only when Turnstile is actually configured.
+let TS_SITEKEY = null;      // null = unfetched; "" = not configured (skip)
+let _tsScript = null;
+async function tsInit() {
+  if (TS_SITEKEY === null) {
+    try { TS_SITEKEY = ((await (await fetch("/api/turnstile")).json()).sitekey) || ""; }
+    catch { TS_SITEKEY = ""; }
+  }
+  if (TS_SITEKEY && !window.turnstile && !_tsScript) {
+    _tsScript = new Promise((res) => {
+      const s = document.createElement("script");
+      s.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+      s.async = true; s.defer = true; s.onload = res; s.onerror = res;
+      document.head.appendChild(s);
+    });
+  }
+  if (_tsScript) await _tsScript;
+  return TS_SITEKEY;
+}
+async function tsToken() {
+  const key = await tsInit();
+  if (!key || !window.turnstile) return "";
+  let holder = document.getElementById("ts-holder");
+  if (!holder) {
+    holder = document.createElement("div");
+    holder.id = "ts-holder";
+    holder.style.cssText = "position:fixed;bottom:14px;right:14px;z-index:9999";
+    document.body.appendChild(holder);
+  }
+  return await new Promise((resolve) => {
+    let wid, settled = false;
+    const done = (tok) => {
+      if (settled) return; settled = true;
+      try { window.turnstile.remove(wid); } catch (e) {}
+      resolve(tok || "");
+    };
+    try {
+      wid = window.turnstile.render(holder, {
+        sitekey: key,
+        appearance: "interaction-only",   // invisible unless a challenge is needed
+        callback: (t) => done(t),
+        "error-callback": () => done(""),
+        "timeout-callback": () => done(""),
+      });
+      setTimeout(() => done(""), 20000);   // never hang a submit forever
+    } catch (e) { resolve(""); }
+  });
+}
+
 const LABELS = {
   operational: "Operational", maintenance: "Maintenance", degraded: "Degraded",
   partial_outage: "Partial outage", major_outage: "Major outage", unknown: "Unknown",
@@ -245,7 +299,7 @@ async function submitSuggestion() {
   try {
     const r = await fetch("/api/suggest", {
       method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name: name }),
+      body: JSON.stringify({ name: name, turnstile: await tsToken() }),
     });
     const d = await r.json().catch(() => ({}));
     if (d.already) { if (state) state.textContent = `${d.name} is already tracked — search for it above.`; }
@@ -391,7 +445,7 @@ async function connectWebhook() {
     const res = await fetch("/api/webhook/subscribe", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ url, providers }),
+      body: JSON.stringify({ url, providers, turnstile: await tsToken() }),
     });
     const data = await res.json().catch(() => ({}));
     if (res.ok && data.ok) {
@@ -476,7 +530,7 @@ async function enablePush() {
     if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64ToU8(key) });
     const res = await fetch("/api/push/subscribe", {
       method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ subscription: sub.toJSON(), providers }),
+      body: JSON.stringify({ subscription: sub.toJSON(), providers, turnstile: await tsToken() }),
     });
     const data = await res.json().catch(() => ({}));
     if (res.ok && data.ok) {

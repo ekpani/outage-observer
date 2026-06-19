@@ -1,5 +1,5 @@
 import { poll } from "./poller";
-import { getBoard, getCheckedAt, upsertTarget, setTargetSubs, deleteTargetByToken, addSuggestion, getTopSuggestions } from "./store";
+import { getBoard, getCheckedAt, upsertTarget, setTargetSubs, deleteTargetByToken, addSuggestion, getTopSuggestions, getTargetByChannelAddress } from "./store";
 import { type Env } from "./telegram";
 import { onUpdate } from "./bot";
 import { handleIngest } from "./ingest";
@@ -171,9 +171,15 @@ export default {
       return json({ key: env.VAPID_PUBLIC ?? null });
     }
 
+    // Turnstile public site key for the write-action bot check. Empty string
+    // when unset → the client skips Turnstile entirely (feature stays dormant).
+    if (url.pathname === "/api/turnstile" && request.method === "GET") {
+      return json({ sitekey: env.TURNSTILE_SITEKEY ?? "" });
+    }
+
     // Register / refresh a browser push subscription against a set of providers.
     if (url.pathname === "/api/push/subscribe" && request.method === "POST") {
-      let body: { subscription?: { endpoint?: string; keys?: { p256dh?: string; auth?: string } }; providers?: unknown; regions?: unknown };
+      let body: { subscription?: { endpoint?: string; keys?: { p256dh?: string; auth?: string } }; providers?: unknown; regions?: unknown; turnstile?: unknown };
       try { body = await request.json(); } catch { return json({ error: "Bad JSON." }, 400); }
       const sub = body?.subscription;
       const endpoint = String(sub?.endpoint ?? "");
@@ -186,6 +192,14 @@ export default {
       const providers = Array.isArray(body?.providers) ? (body.providers as unknown[]).map(String).filter((x) => valid.has(x)) : [];
       if (!providers.length) return json({ error: "Start observing at least one service first." }, 400);
       const regions = bodyRegions(body);
+
+      // Turnstile only on first sign-up: background re-syncs of an existing
+      // subscription (e.g. when the watch list changes) skip the check.
+      const ip = request.headers.get("cf-connecting-ip") ?? "unknown";
+      if (!(await getTargetByChannelAddress(env, "webpush", endpoint))
+          && !(await verifyTurnstile(env, String(body?.turnstile ?? ""), ip))) {
+        return json({ error: "Could not verify you're human. Please try again." }, 403);
+      }
 
       const { id, token } = await upsertTarget(env, "webpush", endpoint, JSON.stringify({ p256dh, auth }), regions.length ? regions.join(",") : null);
       await setTargetSubs(env, id, providers);
@@ -202,7 +216,7 @@ export default {
     // Connect a Slack/Discord incoming webhook to a set of providers (the
     // services the caller is observing). POSTed from the board, same-origin.
     if (url.pathname === "/api/webhook/subscribe" && request.method === "POST") {
-      let body: { url?: string; providers?: unknown; regions?: unknown };
+      let body: { url?: string; providers?: unknown; regions?: unknown; turnstile?: unknown };
       try { body = await request.json(); } catch { return json({ error: "Bad JSON." }, 400); }
       const hookUrl = String(body?.url ?? "").trim();
       const kind = detectWebhookKind(hookUrl);
@@ -211,6 +225,13 @@ export default {
       const providers = Array.isArray(body?.providers) ? (body.providers as unknown[]).map(String).filter((x) => valid.has(x)) : [];
       if (!providers.length) return json({ error: "Start observing at least one service first." }, 400);
       const regions = bodyRegions(body);
+
+      // Turnstile only when first connecting a webhook URL (not on re-subscribe).
+      const ip = request.headers.get("cf-connecting-ip") ?? "unknown";
+      if (!(await getTargetByChannelAddress(env, kind, hookUrl))
+          && !(await verifyTurnstile(env, String(body?.turnstile ?? ""), ip))) {
+        return json({ error: "Could not verify you're human. Please try again." }, 403);
+      }
 
       const { id, token } = await upsertTarget(env, kind, hookUrl, null, regions.length ? regions.join(",") : null);
       await setTargetSubs(env, id, providers);
@@ -230,8 +251,11 @@ export default {
       const ip = request.headers.get("cf-connecting-ip") ?? "unknown";
       const { success } = await env.SUBSCRIBE_LIMIT.limit({ key: "suggest:" + ip });
       if (!success) return json({ error: "Too many requests. Try again shortly." }, 429);
-      let body: { name?: unknown };
+      let body: { name?: unknown; turnstile?: unknown };
       try { body = await request.json(); } catch { return json({ error: "Bad JSON." }, 400); }
+      if (!(await verifyTurnstile(env, String(body?.turnstile ?? ""), ip))) {
+        return json({ error: "Could not verify you're human. Please try again." }, 403);
+      }
       const name = String(body?.name ?? "").trim().replace(/\s+/g, " ");
       if (name.length < 2 || name.length > 60) return json({ error: "Enter a service name (2 to 60 characters)." }, 400);
       if (CATALOG.some((p) => p.name.toLowerCase() === name.toLowerCase())) {
@@ -338,6 +362,26 @@ export default {
     return new Response("not found", { status: 404 });
   },
 };
+
+/** Verify a Cloudflare Turnstile token server-side. Returns true (allow) when
+ *  Turnstile isn't configured (dormant rollout) or when its API is unreachable
+ *  (fail-open — a Turnstile outage must not block real subscribers; the per-IP
+ *  SUBSCRIBE_LIMIT still applies). Fails CLOSED only on an explicit bad token. */
+async function verifyTurnstile(env: Env, token: string, ip: string): Promise<boolean> {
+  if (!env.TURNSTILE_SECRET) return true;          // not configured -> don't block
+  if (!token) return false;
+  try {
+    const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ secret: env.TURNSTILE_SECRET, response: token, remoteip: ip }),
+    });
+    const data = await res.json<{ success?: boolean }>();
+    return data?.success === true;
+  } catch {
+    return true;                                    // fail-open on a Turnstile outage
+  }
+}
 
 /** Hex SHA-256, used to hash an IP into an opaque voter key (we never store raw IPs). */
 async function sha256hex(s: string): Promise<string> {

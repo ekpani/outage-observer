@@ -16,6 +16,12 @@ export interface Env {
   SUBSCRIBE_LIMIT: RateLimit;
   // Per-user throttle on bot commands (Telegram/Slack/Discord).
   CMD_LIMIT: RateLimit;
+  // Cloudflare Turnstile (bot check on the public write endpoints). Both set via
+  // `wrangler secret put`; optional, so the endpoints run unguarded until set.
+  // TURNSTILE_SITEKEY is the public widget key (handed to the browser);
+  // TURNSTILE_SECRET signs the server-side siteverify call.
+  TURNSTILE_SITEKEY?: string;
+  TURNSTILE_SECRET?: string;
   // Durable Object that runs the reliable 1-minute poll loop via alarms.
   POLLER: DurableObjectNamespace;
   // Discord bot (HTTP interactions endpoint). All set via `wrangler secret put`;
