@@ -129,16 +129,21 @@ export async function applyResults(
   //    its headline green during a contained incident). Commit the state above,
   //    just don't alert "recovered" for it.
   const alertable = confirmed.filter((c) => !(c.to === "operational" && c.status.incidents.length > 0));
-  if (alertable.length) await fanOut(env, alertable);
+  const didFanOut = alertable.length > 0;
+  if (didFanOut) await fanOut(env, alertable);
 
   // 6) Drain bounded batches every tick so any backlog flushes over subsequent
   //    ticks. Guarded: the essential work above (state CAS, board, enqueue) is
   //    already committed, so if delivery ever hits the subrequest ceiling during
   //    a heavy incident we swallow it and let the remaining rows flush next tick
   //    rather than throwing away this tick's confirmed transitions.
+  //    Adaptive: a tick that fanned out already spent ~5 subrequests on the
+  //    fan-out lookups/enqueues, so it drains conservatively; a quiet tick has
+  //    that headroom free, so it drains more to clear any backlog faster. Both
+  //    stay under the 50-subrequest free-tier ceiling (drain costs 2 + N each).
   try {
-    await drainOutbox(env, 6);
-    await drainTargetOutbox(env, 4);
+    await drainOutbox(env, didFanOut ? 6 : 9);
+    await drainTargetOutbox(env, didFanOut ? 4 : 5);
   } catch (err) {
     console.warn("drain deferred to next tick", String(err));
   }

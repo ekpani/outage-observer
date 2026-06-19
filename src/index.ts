@@ -65,7 +65,7 @@ export default {
       // Self-heal: if the source has gone stale (cron stalled AND the heartbeat
       // hasn't caught up), refresh it in the background so any visit re-polls —
       // long before the 10-min user-facing staleness banner would ever show. The
-      // edge cache (s-maxage=30) already limits this to ~one trigger per 30s; a
+      // edge cache (s-maxage=60) already limits this to ~one trigger per 60s; a
       // 2-min lock guards against a burst of simultaneous cache misses. Safe to
       // run concurrently with the cron now that transition detection is an atomic
       // compare-and-set (no double/lost alerts).
@@ -93,7 +93,7 @@ export default {
           headers: {
             "content-type": "application/json; charset=utf-8",
             "access-control-allow-origin": "*",
-            "cache-control": "public, max-age=15, s-maxage=30",
+            "cache-control": "public, max-age=30, s-maxage=60",
           },
         },
       );

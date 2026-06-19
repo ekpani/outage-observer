@@ -10,6 +10,19 @@ import { type Level } from "./adapters";
 const BY_ID = new Map(CATALOG.map((p) => [p.id, p] as const));
 const BY_NAME = new Map(CATALOG.map((p) => [p.name.toLowerCase(), p] as const));
 
+/** Per-user command throttle, shared by all three bots. Returns true if the
+ *  command may proceed. Fails OPEN: a rate-limiter hiccup must never take the
+ *  bot down. The inbound webhook has already cost us one request either way;
+ *  this caps the *outbound* work (bot-API calls, board reads) one chat can
+ *  trigger, so a flood can't burn our quota or starve the poll's subrequests. */
+export async function cmdRateOk(env: Env, key: string): Promise<boolean> {
+  try {
+    return (await env.CMD_LIMIT.limit({ key })).success;
+  } catch {
+    return true;
+  }
+}
+
 /** Resolve one token to a provider by id, common-name alias, or exact name. */
 export function resolveProvider(input: string) {
   const q = input.trim().toLowerCase().replace(/^@/, "");

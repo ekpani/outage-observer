@@ -14,6 +14,8 @@ export interface Env {
   // Per-IP rate limiter for the public subscribe endpoints (Workers Rate
   // Limiting binding; see wrangler.jsonc `ratelimits`).
   SUBSCRIBE_LIMIT: RateLimit;
+  // Per-user throttle on bot commands (Telegram/Slack/Discord).
+  CMD_LIMIT: RateLimit;
   // Durable Object that runs the reliable 1-minute poll loop via alarms.
   POLLER: DurableObjectNamespace;
   // Discord bot (HTTP interactions endpoint). All set via `wrangler secret put`;

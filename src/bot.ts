@@ -22,6 +22,7 @@ import {
   type InlineKeyboard,
   type InlineButton,
 } from "./telegram";
+import { cmdRateOk } from "./botcommands";
 
 const CAT_EMOJI: Record<string, string> = {
   "Cloud & hosting": "☁️",
@@ -250,6 +251,12 @@ async function applyWatch(env: Env, chatId: number, query: string, add: boolean)
 // ---------- Update routing ----------
 
 export async function onUpdate(env: Env, update: any): Promise<void> {
+  // Per-chat flood guard. We've already 200'd the webhook by the time we get
+  // here, so this just stops one chat from making us spend bot-API calls in a
+  // tight loop. Silent drop (no reply) is the cheapest response to a flood.
+  const chatId = update?.callback_query?.message?.chat?.id ?? update?.message?.chat?.id;
+  if (chatId != null && !(await cmdRateOk(env, `tg:${chatId}`))) return;
+
   if (update?.callback_query) {
     await handleCallback(env, update.callback_query);
   } else if (update?.message?.text) {

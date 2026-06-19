@@ -3,7 +3,7 @@
 // /outage subcommands. Delivery uses chat.postMessage with the workspace bot
 // token (stored as a "slack-bot" target keyed on the channel id).
 import { type Env } from "./telegram";
-import { statusText, listText, resolveMany, displayName, HELP } from "./botcommands";
+import { statusText, listText, resolveMany, displayName, HELP, cmdRateOk } from "./botcommands";
 import { upsertTarget, setTargetSubs, getTargetByChannelAddress, getTargetSubs, deleteTargetByChannelAddress, setSlackTeam, getSlackToken } from "./store";
 import { deliver, type AlertEvent } from "./channels";
 import { renderNotice } from "./seo";
@@ -45,7 +45,11 @@ export async function handleSlackCommand(env: Env, request: Request): Promise<Re
   const text = (params.get("text") ?? "").trim();
   const channelId = params.get("channel_id") ?? "";
   const teamId = params.get("team_id") ?? "";
+  const userId = params.get("user_id") ?? "";
   if (!channelId) return reply("Use this in a channel.");
+  if (userId && !(await cmdRateOk(env, `slack:${teamId}:${userId}`))) {
+    return reply("You're sending commands a bit fast — give it a few seconds and try again.");
+  }
 
   const [cmdRaw, ...rest] = text.split(/\s+/);
   const cmd = (cmdRaw || "help").toLowerCase();

@@ -4,7 +4,7 @@
 // Delivery reuses the targets pipeline: the bot finds-or-creates one incoming
 // webhook per channel and stores it as a "discord-bot" target.
 import { type Env } from "./telegram";
-import { statusText, listText, resolveMany, displayName, HELP } from "./botcommands";
+import { statusText, listText, resolveMany, displayName, HELP, cmdRateOk } from "./botcommands";
 import { upsertTarget, setTargetSubs, getTargetByChannelAddress, getTargetSubs, deleteTargetByChannelAddress } from "./store";
 import { renderNotice } from "./seo";
 
@@ -66,6 +66,13 @@ export async function handleDiscordInteraction(env: Env, request: Request, ctx: 
 
   if (body.type === 1) return json({ type: 1 });           // PING -> PONG (endpoint setup)
   if (body.type !== 2) return json({ type: 1 });           // only handle slash commands
+
+  // Per-user flood guard (ephemeral reply is just the HTTP response — no extra
+  // API call), so one user can't loop slash commands and burn our quota.
+  const userId: string = body.member?.user?.id ?? body.user?.id ?? "";
+  if (userId && !(await cmdRateOk(env, `discord:${userId}`))) {
+    return reply("You're sending commands a bit fast — give it a few seconds and try again.");
+  }
 
   const sub = body.data?.options?.[0];
   const name: string = sub?.name ?? "";

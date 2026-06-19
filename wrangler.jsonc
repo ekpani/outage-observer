@@ -39,6 +39,15 @@
       "name": "SUBSCRIBE_LIMIT",
       "namespace_id": "1001",
       "simple": { "limit": 10, "period": 60 }
+    },
+    // Per-user throttle on bot commands (Telegram/Slack/Discord), so one chat
+    // can't flood our bot-API quota or the per-tick subrequest budget. Generous
+    // enough that real use — including rapid button taps when picking services —
+    // never trips it; only a flood does. Keyed by platform user/chat id.
+    {
+      "name": "CMD_LIMIT",
+      "namespace_id": "1002",
+      "simple": { "limit": 30, "period": 60 }
     }
   ],
   // Durable Object running the reliable 1-minute poll loop via alarms (the
