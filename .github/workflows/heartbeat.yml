@@ -34,8 +34,14 @@ jobs:
           set -euo pipefail
           # Poll twice so two rotating shards advance each run. Pass the key as a
           # header, not a query string, so it doesn't land in request logs.
+          #
+          # Hit the *.workers.dev origin, not the custom domain: outage.observer
+          # has Bot Fight Mode on, which 403s automated requests from datacenter
+          # IPs (GitHub runners) before they reach the Worker. workers.dev is a
+          # different zone, not behind that toggle, so the backstop keeps working
+          # while the public domain stays protected. Same Worker, same /debug/poll.
           for i in 1 2; do
-            code=$(curl -sS -o /dev/null -w "%{http_code}" -H "x-debug-key: ${POLL_KEY}" "https://outage.observer/debug/poll")
+            code=$(curl -sS -o /dev/null -w "%{http_code}" -H "x-debug-key: ${POLL_KEY}" "https://outage-observer.amrith.workers.dev/debug/poll")
             echo "poll $i -> HTTP $code"
             [ "$code" = "200" ] || exit 1
             sleep 5
